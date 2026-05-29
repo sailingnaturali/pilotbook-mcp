@@ -73,3 +73,15 @@ def test_source_pdf_round_trips():
                   source_pdf="../sources/s.pdf#page=5")
     reparsed = Anchorage.from_markdown(a.to_markdown())
     assert reparsed.source_pdf == "../sources/s.pdf#page=5"
+
+
+def test_facilities_fields_round_trip():
+    a = Anchorage(name="Marina Cove", source="S", lat=1.0, lon=2.0,
+                  shore_power="30A", pumpout=True, potable_water=True, garbage=True,
+                  facilities=["fuel", "restaurant", "wifi"])
+    r = Anchorage.from_markdown(a.to_markdown())
+    assert r.shore_power == "30A"
+    assert r.pumpout is True
+    assert r.potable_water is True
+    assert r.garbage is True
+    assert r.facilities == ["fuel", "restaurant", "wifi"]

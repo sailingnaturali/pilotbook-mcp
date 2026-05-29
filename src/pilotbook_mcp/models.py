@@ -27,6 +27,11 @@ class Anchorage:
     tidal_current: str | None = None     # none | weak | moderate | strong | reversing
     cell_coverage: str | None = None     # good | spotty | none
     crowding: str | None = None          # low | moderate | high
+    shore_power: str | None = None       # amps if stated: "15A" | "30A" | "20/30/50A"; None if absent
+    pumpout: bool | None = None          # blackwater pumpout available
+    potable_water: bool | None = None    # fresh water at a dock
+    garbage: bool | None = None          # garbage drop accepted (fee may be noted in prose)
+    facilities: list[str] = field(default_factory=list)  # fuel, restaurant, pub, general store, deli, liquor, laundry, ATM, wifi, showers, marina, customs
     hazards: list[str] = field(default_factory=list)
     last_updated: str | None = None
     confidence: str | None = None        # high | medium | low

@@ -38,7 +38,7 @@ def _make_client():
     return anthropic.Anthropic(api_key=os.environ["ANTHROPIC_API_KEY"])
 
 
-def run_ingest(pdf_path: str, source: str, vault: str | None = None) -> None:
+def run_ingest(pdf_path: str, source: str, vault: str | None = None, force: bool = False) -> None:
     root = Path(vault) if vault else vault_path()
     pages = pdf.extract_pages(pdf_path)
     if pdf.is_scanned("\n".join(pages), len(pages)):
@@ -54,7 +54,7 @@ def run_ingest(pdf_path: str, source: str, vault: str | None = None) -> None:
         "pages": page_count, "ingested": _dt.date.today().isoformat(),
     })
 
-    covered = _covered_pages(root, source)
+    covered = set() if force else _covered_pages(root, source)
     client = _make_client()
     written = low = failed = skipped = 0
     for page_no, page in candidate_pages(pages):
@@ -135,6 +135,8 @@ def main() -> None:
     p_ing.add_argument("pdf")
     p_ing.add_argument("--source", required=True, help='e.g. "SalishSeaPilot — Gulf Islands 2025"')
     p_ing.add_argument("--vault", default=None)
+    p_ing.add_argument("--force", action="store_true",
+                       help="re-extract every page, ignoring already-ingested coverage")
 
     p_rev = sub.add_parser("review", help="list anchorages needing human review")
     p_rev.add_argument("--vault", default=None)
@@ -144,7 +146,7 @@ def main() -> None:
 
     args = parser.parse_args()
     if args.cmd == "ingest":
-        run_ingest(args.pdf, source=args.source, vault=args.vault)
+        run_ingest(args.pdf, source=args.source, vault=args.vault, force=args.force)
     elif args.cmd == "review":
         run_review(args.vault)
     elif args.cmd == "index":

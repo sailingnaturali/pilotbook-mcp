@@ -23,6 +23,11 @@ i.e. wind or swell FROM those directions makes it uncomfortable. Examples:
 but SE winds" -> ["SE"]. Derive lat/lon from the page coordinates (decimal degrees;
 W and S are negative). Set `confidence` to your confidence in exposed_sectors.
 Put the original anchorage description (lightly cleaned) in `prose`.
+Also record shore-side facilities when the page or its chartlet shows them (icons or
+labels like fuel/gas, pumpout, water, garbage, power with amps, restaurant, pub,
+store, laundry, ATM, WiFi, showers, marina, customs). Set the structured fields
+(shore_power, pumpout, potable_water, garbage) and list the rest in `facilities`.
+Omit anything not indicated — most wild anchorages have no facilities.
 """
 
 _8POINT = ["N", "NE", "E", "SE", "S", "SW", "W", "NW"]
@@ -52,6 +57,15 @@ ANCHORAGE_TOOL = {
                               "enum": ["none", "weak", "moderate", "strong", "reversing"]},
             "cell_coverage": {"type": "string", "enum": ["good", "spotty", "none"]},
             "crowding": {"type": "string", "enum": ["low", "moderate", "high"]},
+            "shore_power": {"type": "string",
+                            "description": "shore power amperage if mentioned, e.g. '30A' or '20/30/50A'"},
+            "pumpout": {"type": "boolean", "description": "blackwater pumpout available"},
+            "potable_water": {"type": "boolean", "description": "fresh water available at a dock"},
+            "garbage": {"type": "boolean", "description": "garbage drop-off accepted"},
+            "facilities": {"type": "array", "items": {"type": "string",
+                "enum": ["fuel", "restaurant", "pub", "general store", "deli", "liquor",
+                         "laundry", "ATM", "wifi", "showers", "marina", "customs"]},
+                "description": "shore-side amenities present at or adjacent to the anchorage"},
             "hazards": {"type": "array", "items": {"type": "string"}},
             "last_updated": {"type": "string"},
             "confidence": {"type": "string", "enum": ["high", "medium", "low"]},

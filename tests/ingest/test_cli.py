@@ -76,6 +76,32 @@ def test_run_review_flags_low_confidence(tmp_path, capsys):
     assert "Good" not in out
 
 
+def test_run_ingest_force_reprocesses_covered_pages(tmp_path, monkeypatch):
+    pdf_file = tmp_path / "book.pdf"
+    pdf_file.write_bytes(b"%PDF fake")
+    vault = tmp_path / "vault"
+    source = "TestPilot — X 2025"
+
+    from pilotbook_mcp.ingest.writer import write_anchorage
+    write_anchorage(vault, Anchorage(name="Old", source=source, lat=48.0, lon=-123.0,
+                                     exposed_sectors=["S"], confidence="high",
+                                     source_pdf="../sources/testpilot-x-2025.pdf#page=1"))
+
+    monkeypatch.setattr(cli.pdf, "extract_pages", lambda p: ["48°21.50'N P1"])
+    monkeypatch.setattr(cli.pdf, "is_scanned", lambda text, pages: False)
+    monkeypatch.setattr(cli, "_make_client", lambda: object())
+    calls = []
+    def fake_extract(chunk, src, *, client, model):
+        calls.append(chunk)
+        return Anchorage(name="Old", source=src, lat=48.0, lon=-123.0,
+                         exposed_sectors=["S"], confidence="high")
+    monkeypatch.setattr(cli, "extract_record", fake_extract)
+
+    # force=True must re-extract page 1 even though it's already covered
+    cli.run_ingest(str(pdf_file), source=source, vault=str(vault), force=True)
+    assert len(calls) == 1
+
+
 def test_run_index_writes_index_json_and_md(tmp_path):
     vault = tmp_path / "vault"
     from pilotbook_mcp.ingest.writer import write_anchorage

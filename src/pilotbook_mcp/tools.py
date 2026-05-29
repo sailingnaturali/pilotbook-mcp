@@ -35,7 +35,10 @@ def get_anchorage(vault: Vault, name: str) -> dict:
         "lat": a.lat, "lon": a.lon, "depth_min_m": a.depth_min_m, "depth_max_m": a.depth_max_m,
         "bottom": a.bottom, "holding": a.holding, "exposed_sectors": a.exposed_sectors,
         "swing_room": a.swing_room, "tidal_current": a.tidal_current,
-        "cell_coverage": a.cell_coverage, "crowding": a.crowding, "hazards": a.hazards,
+        "cell_coverage": a.cell_coverage, "crowding": a.crowding,
+        "shore_power": a.shore_power, "pumpout": a.pumpout,
+        "potable_water": a.potable_water, "garbage": a.garbage, "facilities": a.facilities,
+        "hazards": a.hazards,
         "last_updated": a.last_updated, "prose": a.prose,
     }
     return {"found": True, "anchorage": record}
