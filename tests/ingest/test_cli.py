@@ -10,9 +10,9 @@ def test_run_ingest_writes_vault(tmp_path, monkeypatch):
     pdf.write_bytes(b"%PDF fake")
     vault = tmp_path / "vault"
 
-    monkeypatch.setattr(cli.pdf, "extract_text", lambda p: "48°21.50'N 123°42.68'W\nTest Cove. Exposed to SW.")
+    monkeypatch.setattr(cli.pdf, "extract_pages",
+                        lambda p: ["48°21.50'N 123°42.68'W\nTest Cove. Exposed to SW."])
     monkeypatch.setattr(cli.pdf, "is_scanned", lambda text, pages: False)
-    monkeypatch.setattr(cli, "_page_count", lambda p: 1)
     monkeypatch.setattr(cli, "_make_client", lambda: object())
 
     def fake_extract(chunk, source, *, client, model):

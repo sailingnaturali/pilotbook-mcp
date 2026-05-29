@@ -1,4 +1,4 @@
-from pilotbook_mcp.ingest.segment import COORD_RE, split_on_coordinates
+from pilotbook_mcp.ingest.segment import COORD_RE, MARKER_RE, candidate_pages
 
 
 def test_coord_regex_matches_pilot_book_format():
@@ -6,20 +6,19 @@ def test_coord_regex_matches_pilot_book_format():
     assert not COORD_RE.search("Anchor over mud in 3-5 metres.")
 
 
-def test_split_groups_text_under_each_coordinate():
-    text = (
-        "Front matter with no coords.\n"
-        "48°21.50'N 123°42.68'W\n"
-        "Test Cove. Anchor over mud. Good holding. Exposed to SW.\n"
-        "48°22.65'N 123°42.64'W\n"
-        "Quiet Bay. Well protected. Mud bottom.\n"
-    )
-    chunks = split_on_coordinates(text)
-    assert len(chunks) == 2
-    assert "Test Cove" in chunks[0]
-    assert "48°21.50'N" in chunks[0]
-    assert "Quiet Bay" in chunks[1]
+def test_marker_regex_matches_ebook_anchorage_marker():
+    assert MARKER_RE.search("tB9::Oak-Bay-GI")
+    assert not MARKER_RE.search("t::Gulf-Islands-cover-GI")
 
 
-def test_split_empty_when_no_coords():
-    assert split_on_coordinates("no coordinates here at all") == []
+def test_candidate_pages_keeps_coord_or_marker_pages():
+    pages = [
+        "Cover page, no coords or marker.",
+        "tB9::Oak-Bay-GI\nOak Bay. Good holding.",
+        "48°21.50'N 123°42.68'W\nTest Cove. Exposed to SW.",
+        "Region intro prose with no markers at all.",
+    ]
+    kept = candidate_pages(pages)
+    assert len(kept) == 2
+    assert "Oak Bay" in kept[0]
+    assert "Test Cove" in kept[1]

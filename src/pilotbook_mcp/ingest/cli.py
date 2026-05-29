@@ -6,21 +6,13 @@ import argparse
 import datetime as _dt
 import json
 import os
-import subprocess
 from pathlib import Path
 
 from pilotbook_mcp.ingest import pdf
 from pilotbook_mcp.ingest.extract import extract_record
+from pilotbook_mcp.ingest.segment import candidate_pages
 from pilotbook_mcp.ingest.writer import archive_source, sha256_file, update_manifest, write_anchorage
 from pilotbook_mcp.vault import Vault, vault_path
-
-
-def _page_count(pdf_path: str | Path) -> int:
-    out = subprocess.run(["pdfinfo", str(pdf_path)], capture_output=True, text=True, check=True).stdout
-    for line in out.splitlines():
-        if line.startswith("Pages:"):
-            return int(line.split(":")[1].strip())
-    return 0
 
 
 def _make_client():
@@ -30,10 +22,10 @@ def _make_client():
 
 def run_ingest(pdf_path: str, source: str, vault: str | None = None) -> None:
     root = Path(vault) if vault else vault_path()
-    pages = _page_count(pdf_path)
-    text = pdf.extract_text(pdf_path)
-    if pdf.is_scanned(text, pages):
-        text = pdf.ocr_to_text(pdf_path)
+    pages = pdf.extract_pages(pdf_path)
+    if pdf.is_scanned("\n".join(pages), len(pages)):
+        pages = pdf.ocr_to_text(pdf_path).split("\x0c")
+    page_count = len(pages)
 
     dest = archive_source(pdf_path, source, root)
     update_manifest(root, {
@@ -41,14 +33,15 @@ def run_ingest(pdf_path: str, source: str, vault: str | None = None) -> None:
         "sha256": sha256_file(pdf_path),
         "publisher": source.split("—")[0].strip() if "—" in source else None,
         "year": next((int(t) for t in source.split() if t.isdigit() and len(t) == 4), None),
-        "pages": pages, "ingested": _dt.date.today().isoformat(),
+        "pages": page_count, "ingested": _dt.date.today().isoformat(),
     })
 
-    from pilotbook_mcp.ingest.segment import split_on_coordinates
     client = _make_client()
     written = low = 0
-    for chunk in split_on_coordinates(text):
-        a = extract_record(chunk, source, client=client, model="claude-sonnet-4-6")
+    for page in candidate_pages(pages):
+        a = extract_record(page, source, client=client, model="claude-sonnet-4-6")
+        if a is None:
+            continue
         write_anchorage(root, a)
         written += 1
         if a.confidence != "high" or not a.exposed_sectors:

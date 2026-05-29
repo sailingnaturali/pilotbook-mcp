@@ -26,3 +26,13 @@ def test_is_scanned_true_when_text_density_low():
 
 def test_is_scanned_false_with_real_text():
     assert pdf.is_scanned("y" * 5000, pages=10) is False
+
+
+def test_extract_pages_splits_on_formfeed(monkeypatch):
+    def fake_run(cmd, capture_output, text, check):
+        class R:
+            stdout = "page one\x0cpage two\x0cpage three"
+        return R()
+    monkeypatch.setattr(pdf.subprocess, "run", fake_run)
+    pages = pdf.extract_pages("book.pdf")
+    assert pages == ["page one", "page two", "page three"]

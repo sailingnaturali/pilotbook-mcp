@@ -7,8 +7,12 @@ import json
 from pilotbook_mcp.models import Anchorage
 
 _SCHEMA_DOC = """\
-You convert one pilot-book anchorage description into a single JSON object.
-Return ONLY the JSON object, no prose around it. Fields:
+You are given the extracted text of ONE page of a cruising guide. It may include
+scattered chartlet map labels (road names, "RESTAURANT", etc.) — ignore those.
+If the page describes a single anchorage, return ONE JSON object. If the page does
+NOT describe an anchorage (cover, index, region introduction, chartlet only),
+return exactly: null
+JSON object fields:
   name (str), lat (float), lon (float), region (str|null),
   source_page (int|null), depth_min_m (float|null), depth_max_m (float|null),
   bottom (list of: mud|sand|rock|kelp|shell|gravel),
@@ -33,14 +37,15 @@ def build_system_prompt() -> list[dict]:
     return [{"type": "text", "text": _SCHEMA_DOC, "cache_control": {"type": "ephemeral"}}]
 
 
-def _extract_json(text: str) -> dict:
+def _extract_json(text: str) -> dict | None:
     start, end = text.find("{"), text.rfind("}")
     if start == -1 or end == -1:
-        raise ValueError(f"no JSON object in model output: {text[:200]!r}")
-    return json.loads(text[start : end + 1])
+        return None
+    obj = json.loads(text[start : end + 1])
+    return obj or None
 
 
-def extract_record(chunk: str, source: str, *, client, model: str = "claude-sonnet-4-6") -> Anchorage:
+def extract_record(chunk: str, source: str, *, client, model: str = "claude-sonnet-4-6") -> Anchorage | None:
     resp = client.messages.create(
         model=model,
         max_tokens=1500,
@@ -49,6 +54,8 @@ def extract_record(chunk: str, source: str, *, client, model: str = "claude-sonn
     )
     text = "".join(b.text for b in resp.content if getattr(b, "type", None) == "text")
     data = _extract_json(text)
+    if not data or "name" not in data:
+        return None
     data["source"] = source  # provenance is injected, never trusted to the model
     known = set(Anchorage.__dataclass_fields__)
     return Anchorage(**{k: v for k, v in data.items() if k in known})

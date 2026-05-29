@@ -24,6 +24,15 @@ def is_scanned(text: str, pages: int) -> bool:
     return (len(text.strip()) / pages) < _MIN_CHARS_PER_PAGE
 
 
+def extract_pages(pdf_path: str | Path) -> list[str]:
+    """Per-page text via pdftotext -layout, split on the form-feed page separator."""
+    result = subprocess.run(
+        ["pdftotext", "-layout", str(pdf_path), "-"],
+        capture_output=True, text=True, check=True,
+    )
+    return result.stdout.split("\x0c")
+
+
 def ocr_to_text(pdf_path: str | Path) -> str:
     """OCR a scanned PDF (ocrmypdf -> sidecar text). Requires ocrmypdf installed."""
     src = Path(pdf_path)
