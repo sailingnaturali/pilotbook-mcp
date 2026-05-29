@@ -100,8 +100,8 @@ def build_server(vault: Vault) -> Server:
         ]
 
     @server.call_tool()
-    async def _call_tool(name: str, arguments: dict) -> list[types.TextContent]:
-        result = dispatch(vault, name, arguments)
+    async def _call_tool(name: str, arguments: dict | None) -> list[types.TextContent]:
+        result = dispatch(vault, name, arguments or {})
         return [types.TextContent(type="text", text=json.dumps(result, ensure_ascii=False))]
 
     return server
@@ -118,3 +118,7 @@ async def _run() -> None:
 def main() -> None:
     logging.basicConfig(level=logging.INFO)
     asyncio.run(_run())
+
+
+if __name__ == "__main__":
+    main()
