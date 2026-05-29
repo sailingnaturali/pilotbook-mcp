@@ -7,6 +7,7 @@ import datetime as _dt
 import json
 import logging
 import os
+import re
 from pathlib import Path
 
 logger = logging.getLogger(__name__)
@@ -15,7 +16,21 @@ from pilotbook_mcp.ingest import pdf
 from pilotbook_mcp.ingest.extract import extract_record
 from pilotbook_mcp.ingest.segment import candidate_pages
 from pilotbook_mcp.ingest.writer import archive_source, sha256_file, slugify, update_manifest, write_anchorage
+from pilotbook_mcp.models import Anchorage
 from pilotbook_mcp.vault import Vault, vault_path
+
+
+def _covered_pages(root: Path, source: str) -> set[int]:
+    """PDF page numbers already ingested for this source — lets ingest resume."""
+    book_dir = root / "anchorages" / slugify(source)
+    covered: set[int] = set()
+    if book_dir.is_dir():
+        for md in book_dir.glob("*.md"):
+            a = Anchorage.from_markdown(md.read_text(encoding="utf-8"))
+            m = re.search(r"#page=(\d+)", a.source_pdf or "")
+            if m:
+                covered.add(int(m.group(1)))
+    return covered
 
 
 def _make_client():
@@ -39,9 +54,13 @@ def run_ingest(pdf_path: str, source: str, vault: str | None = None) -> None:
         "pages": page_count, "ingested": _dt.date.today().isoformat(),
     })
 
+    covered = _covered_pages(root, source)
     client = _make_client()
-    written = low = failed = 0
+    written = low = failed = skipped = 0
     for page_no, page in candidate_pages(pages):
+        if page_no in covered:
+            skipped += 1
+            continue
         try:
             a = extract_record(page, source, client=client, model="claude-sonnet-4-6")
         except Exception as exc:  # one bad page must not abort the batch
@@ -55,8 +74,8 @@ def run_ingest(pdf_path: str, source: str, vault: str | None = None) -> None:
         written += 1
         if a.confidence != "high" or not a.exposed_sectors:
             low += 1
-    print(f"Ingested {written} anchorages from {source} "
-          f"({low} need review, {failed} pages errored). Vault: {root}")
+    print(f"Ingested {written} new anchorages from {source} "
+          f"({skipped} pages already done, {low} need review, {failed} errored). Vault: {root}")
 
 
 def run_review(vault: str | None = None) -> None:

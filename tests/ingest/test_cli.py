@@ -29,6 +29,40 @@ def test_run_ingest_writes_vault(tmp_path, monkeypatch):
     assert v.get("Test Cove").source_pdf == "../sources/testpilot-x-2025.pdf#page=1"
 
 
+def test_run_ingest_skips_already_covered_pages(tmp_path, monkeypatch):
+    pdf_file = tmp_path / "book.pdf"
+    pdf_file.write_bytes(b"%PDF fake")
+    vault = tmp_path / "vault"
+    source = "TestPilot — X 2025"
+
+    # Pre-seed page 1 as already ingested (with a source_pdf #page=1 link).
+    from pilotbook_mcp.ingest.writer import write_anchorage
+    write_anchorage(vault, Anchorage(name="Already Done", source=source, lat=48.0, lon=-123.0,
+                                     exposed_sectors=["S"], confidence="high",
+                                     source_pdf="../sources/testpilot-x-2025.pdf#page=1"))
+
+    # Two candidate pages: page 1 (covered) and page 2 (new).
+    monkeypatch.setattr(cli.pdf, "extract_pages",
+                        lambda p: ["48°21.50'N P1", "48°22.00'N P2"])
+    monkeypatch.setattr(cli.pdf, "is_scanned", lambda text, pages: False)
+    monkeypatch.setattr(cli, "_make_client", lambda: object())
+
+    calls = []
+    def fake_extract(chunk, src, *, client, model):
+        calls.append(chunk)
+        return Anchorage(name="New Cove", source=src, lat=48.4, lon=-123.7,
+                         exposed_sectors=["SW"], confidence="high")
+    monkeypatch.setattr(cli, "extract_record", fake_extract)
+
+    cli.run_ingest(str(pdf_file), source=source, vault=str(vault))
+
+    # Page 1 was skipped (not re-extracted); only page 2 hit the model.
+    assert len(calls) == 1 and "P2" in calls[0]
+    v = Vault.load(vault)
+    assert v.get("Already Done") is not None
+    assert v.get("New Cove") is not None
+
+
 def test_run_review_flags_low_confidence(tmp_path, capsys):
     vault = tmp_path / "vault"
     from pilotbook_mcp.ingest.writer import write_anchorage

@@ -35,6 +35,19 @@ def test_update_manifest_appends_entry(tmp_path):
     assert sources[0]["pages"] == 143
 
 
+def test_update_manifest_dedupes_by_retitled(tmp_path):
+    vault = tmp_path / "vault"
+    vault.mkdir()
+    e1 = {"retitled": "a.pdf", "original": "RawV1.pdf", "pages": 100}
+    e2 = {"retitled": "a.pdf", "original": "RawV2.pdf", "pages": 144}
+    update_manifest(vault, e1)
+    update_manifest(vault, e2)
+    sources = Vault.load(vault).sources()
+    assert len(sources) == 1
+    assert sources[0]["original"] == "RawV2.pdf"
+    assert sources[0]["pages"] == 144
+
+
 def test_write_anchorage_creates_slugged_md(tmp_path):
     vault = tmp_path / "vault"
     a = Anchorage(name="Test Cove", source="X", lat=48.5, lon=-123.4, exposed_sectors=["SW"])

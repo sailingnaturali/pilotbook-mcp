@@ -38,7 +38,9 @@ def update_manifest(vault: str | Path, entry: dict) -> None:
     data = {"sources": []}
     if manifest.is_file():
         data = yaml.safe_load(manifest.read_text(encoding="utf-8")) or {"sources": []}
-    data.setdefault("sources", []).append(entry)
+    sources = data.setdefault("sources", [])
+    sources[:] = [s for s in sources if s.get("retitled") != entry.get("retitled")]
+    sources.append(entry)
     manifest.write_text(yaml.safe_dump(data, sort_keys=False, allow_unicode=True), encoding="utf-8")
 
 
