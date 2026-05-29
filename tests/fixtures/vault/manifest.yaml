@@ -1,0 +1,8 @@
+sources:
+  - retitled: testpilot-test-region-2025.pdf
+    original: TestPilot.pdf
+    sha256: deadbeef
+    publisher: TestPilot
+    year: 2025
+    pages: 2
+    ingested: 2026-05-28
