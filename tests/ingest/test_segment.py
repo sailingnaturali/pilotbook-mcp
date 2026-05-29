@@ -20,5 +20,5 @@ def test_candidate_pages_keeps_coord_or_marker_pages():
     ]
     kept = candidate_pages(pages)
     assert len(kept) == 2
-    assert "Oak Bay" in kept[0]
-    assert "Test Cove" in kept[1]
+    assert kept[0][0] == 2 and "Oak Bay" in kept[0][1]
+    assert kept[1][0] == 3 and "Test Cove" in kept[1][1]

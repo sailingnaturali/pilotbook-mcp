@@ -41,15 +41,16 @@ def run_ingest(pdf_path: str, source: str, vault: str | None = None) -> None:
 
     client = _make_client()
     written = low = failed = 0
-    for page in candidate_pages(pages):
+    for page_no, page in candidate_pages(pages):
         try:
             a = extract_record(page, source, client=client, model="claude-sonnet-4-6")
         except Exception as exc:  # one bad page must not abort the batch
             failed += 1
-            logger.warning("extraction failed on a page: %s", exc)
+            logger.warning("extraction failed on page %d: %s", page_no, exc)
             continue
         if a is None:
             continue
+        a.source_pdf = f"../sources/{dest.name}#page={page_no}"
         write_anchorage(root, a)
         written += 1
         if a.confidence != "high" or not a.exposed_sectors:

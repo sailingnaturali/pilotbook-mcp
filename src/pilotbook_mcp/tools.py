@@ -31,6 +31,7 @@ def get_anchorage(vault: Vault, name: str) -> dict:
         return {"found": False, "name": name}
     record = {
         "name": a.name, "region": a.region, "source": a.source, "source_page": a.source_page,
+        "source_pdf": a.source_pdf,
         "lat": a.lat, "lon": a.lon, "depth_min_m": a.depth_min_m, "depth_max_m": a.depth_max_m,
         "bottom": a.bottom, "holding": a.holding, "exposed_sectors": a.exposed_sectors,
         "swing_room": a.swing_room, "tidal_current": a.tidal_current,

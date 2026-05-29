@@ -66,3 +66,10 @@ def test_missing_optional_fields_default_safely():
     assert a.bottom == []
     assert a.holding is None
     assert a.prose.strip() == "Body."
+
+
+def test_source_pdf_round_trips():
+    a = Anchorage(name="X", source="S", lat=1.0, lon=2.0,
+                  source_pdf="../sources/s.pdf#page=5")
+    reparsed = Anchorage.from_markdown(a.to_markdown())
+    assert reparsed.source_pdf == "../sources/s.pdf#page=5"

@@ -17,6 +17,7 @@ class Anchorage:
     lon: float
     region: str | None = None
     source_page: int | None = None
+    source_pdf: str | None = None       # vault-relative link to the page: ../sources/<file>.pdf#page=N
     depth_min_m: float | None = None
     depth_max_m: float | None = None
     bottom: list[str] = field(default_factory=list)

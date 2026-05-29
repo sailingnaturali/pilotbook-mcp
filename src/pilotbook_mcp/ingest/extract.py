@@ -90,5 +90,5 @@ def extract_record(chunk: str, source: str, *, client, model: str = "claude-sonn
         return None
     data.pop("is_anchorage", None)
     data["source"] = source  # provenance is injected, never trusted to the model
-    known = set(Anchorage.__dataclass_fields__)
+    known = set(Anchorage.__dataclass_fields__) - {"source_pdf"}  # set deterministically by the CLI, never by the model
     return Anchorage(**{k: v for k, v in data.items() if k in known})

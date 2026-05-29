@@ -26,6 +26,7 @@ def test_run_ingest_writes_vault(tmp_path, monkeypatch):
     assert v.get("Test Cove").exposed_sectors == ["SW"]
     assert v.sources()[0]["retitled"] == "testpilot-x-2025.pdf"
     assert v.sources()[0]["pages"] == 1
+    assert v.get("Test Cove").source_pdf == "../sources/testpilot-x-2025.pdf#page=1"
 
 
 def test_run_review_flags_low_confidence(tmp_path, capsys):

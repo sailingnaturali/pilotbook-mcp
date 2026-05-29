@@ -10,6 +10,7 @@ COORD_RE = re.compile(r"\d{1,3}°\d{1,2}\.\d+[''][NSEW]")
 MARKER_RE = re.compile(r"t[A-Z]+\d+::")
 
 
-def candidate_pages(pages: list[str]) -> list[str]:
-    """Pages likely to describe an anchorage: have a coordinate or an anchorage marker."""
-    return [p for p in pages if COORD_RE.search(p) or MARKER_RE.search(p)]
+def candidate_pages(pages: list[str]) -> list[tuple[int, str]]:
+    """(1-based PDF page number, text) for pages likely to describe an anchorage."""
+    return [(i + 1, p) for i, p in enumerate(pages)
+            if COORD_RE.search(p) or MARKER_RE.search(p)]
