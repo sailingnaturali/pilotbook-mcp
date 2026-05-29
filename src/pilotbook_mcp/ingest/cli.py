@@ -5,8 +5,11 @@ from __future__ import annotations
 import argparse
 import datetime as _dt
 import json
+import logging
 import os
 from pathlib import Path
+
+logger = logging.getLogger(__name__)
 
 from pilotbook_mcp.ingest import pdf
 from pilotbook_mcp.ingest.extract import extract_record
@@ -37,16 +40,22 @@ def run_ingest(pdf_path: str, source: str, vault: str | None = None) -> None:
     })
 
     client = _make_client()
-    written = low = 0
+    written = low = failed = 0
     for page in candidate_pages(pages):
-        a = extract_record(page, source, client=client, model="claude-sonnet-4-6")
+        try:
+            a = extract_record(page, source, client=client, model="claude-sonnet-4-6")
+        except Exception as exc:  # one bad page must not abort the batch
+            failed += 1
+            logger.warning("extraction failed on a page: %s", exc)
+            continue
         if a is None:
             continue
         write_anchorage(root, a)
         written += 1
         if a.confidence != "high" or not a.exposed_sectors:
             low += 1
-    print(f"Ingested {written} anchorages from {source} ({low} need review). Vault: {root}")
+    print(f"Ingested {written} anchorages from {source} "
+          f"({low} need review, {failed} pages errored). Vault: {root}")
 
 
 def run_review(vault: str | None = None) -> None:
