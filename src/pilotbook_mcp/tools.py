@@ -39,7 +39,7 @@ def get_anchorage(vault: Vault, name: str) -> dict:
         "shore_power": a.shore_power, "pumpout": a.pumpout,
         "potable_water": a.potable_water, "garbage": a.garbage, "facilities": a.facilities,
         "hazards": a.hazards,
-        "last_updated": a.last_updated, "prose": a.prose,
+        "last_updated": a.last_updated, "confidence": a.confidence, "prose": a.prose,
     }
     return {"found": True, "anchorage": record}
 

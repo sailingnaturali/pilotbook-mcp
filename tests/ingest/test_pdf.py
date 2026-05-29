@@ -36,3 +36,12 @@ def test_extract_pages_splits_on_formfeed(monkeypatch):
     monkeypatch.setattr(pdf.subprocess, "run", fake_run)
     pages = pdf.extract_pages("book.pdf")
     assert pages == ["page one", "page two", "page three"]
+
+
+def test_extract_pages_drops_trailing_formfeed(monkeypatch):
+    def fake_run(cmd, capture_output, text, check):
+        class R:
+            stdout = "page one\x0cpage two\x0c"  # trailing form-feed like real pdftotext
+        return R()
+    monkeypatch.setattr(pdf.subprocess, "run", fake_run)
+    assert pdf.extract_pages("book.pdf") == ["page one", "page two"]

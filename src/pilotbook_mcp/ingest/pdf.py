@@ -30,7 +30,10 @@ def extract_pages(pdf_path: str | Path) -> list[str]:
         ["pdftotext", "-layout", str(pdf_path), "-"],
         capture_output=True, text=True, check=True,
     )
-    return result.stdout.split("\x0c")
+    pages = result.stdout.split("\x0c")
+    if pages and not pages[-1].strip():
+        pages.pop()  # pdftotext appends a trailing form-feed → drop the empty tail page
+    return pages
 
 
 def ocr_to_text(pdf_path: str | Path) -> str:

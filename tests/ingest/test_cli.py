@@ -129,6 +129,22 @@ def test_run_ingest_force_clears_stale_records(tmp_path, monkeypatch):
     assert v.get("Fresh Name") is not None   # re-extracted
 
 
+def test_run_ingest_skips_out_of_range_coordinates(tmp_path, monkeypatch):
+    pdf_file = tmp_path / "book.pdf"
+    pdf_file.write_bytes(b"%PDF fake")
+    vault = tmp_path / "vault"
+    monkeypatch.setattr(cli.pdf, "extract_pages", lambda p: ["48°21.50'N bad"])
+    monkeypatch.setattr(cli.pdf, "is_scanned", lambda text, pages: False)
+    monkeypatch.setattr(cli, "_make_client", lambda: object())
+    monkeypatch.setattr(cli, "extract_record",
+                        lambda chunk, src, *, client, model: Anchorage(
+                            name="Bad Coord", source=src, lat=483.6, lon=-123.0,
+                            exposed_sectors=["S"], confidence="high"))
+    cli.run_ingest(str(pdf_file), source="TestPilot — X 2025", vault=str(vault))
+    from pilotbook_mcp.vault import Vault
+    assert Vault.load(vault).get("Bad Coord") is None  # rejected, not written
+
+
 def test_run_index_writes_index_json_and_md(tmp_path):
     vault = tmp_path / "vault"
     from pilotbook_mcp.ingest.writer import write_anchorage

@@ -34,6 +34,7 @@ def test_get_anchorage_returns_full_record_and_prose():
     assert out["found"] is True
     assert out["anchorage"]["source"] == "TestPilot — Test Region 2025"
     assert "good holding" in out["anchorage"]["prose"]
+    assert out["anchorage"]["confidence"] == "high"
 
 
 def test_get_anchorage_missing():

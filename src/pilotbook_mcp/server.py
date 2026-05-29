@@ -18,8 +18,6 @@ from pilotbook_mcp.vault import Vault
 
 logger = logging.getLogger(__name__)
 
-TOOL_NAMES = ["find_anchorages_near", "get_anchorage", "rank_anchorages", "list_sources"]
-
 _FORECAST_STEP = {
     "type": "object",
     "properties": {

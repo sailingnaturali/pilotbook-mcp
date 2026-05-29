@@ -34,6 +34,11 @@ def _covered_pages(root: Path, source: str) -> set[int]:
     return covered
 
 
+def _valid_coords(lat, lon) -> bool:
+    return (lat is not None and lon is not None
+            and -90 <= lat <= 90 and -180 <= lon <= 180)
+
+
 def _make_client():
     import anthropic
     return anthropic.Anthropic(api_key=os.environ["ANTHROPIC_API_KEY"])
@@ -75,6 +80,10 @@ def run_ingest(pdf_path: str, source: str, vault: str | None = None, force: bool
             logger.warning("extraction failed on page %d: %s", page_no, exc)
             continue
         if a is None:
+            continue
+        if not _valid_coords(a.lat, a.lon):
+            failed += 1
+            logger.warning("skipping %s: invalid coordinates (%s, %s)", a.name, a.lat, a.lon)
             continue
         a.source_pdf = f"../sources/{dest.name}#page={page_no}"
         write_anchorage(root, a)
