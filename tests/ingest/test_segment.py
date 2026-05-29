@@ -7,8 +7,9 @@ def test_coord_regex_matches_pilot_book_format():
 
 
 def test_marker_regex_matches_ebook_anchorage_marker():
-    assert MARKER_RE.search("tB9::Oak-Bay-GI")
-    assert not MARKER_RE.search("t::Gulf-Islands-cover-GI")
+    assert MARKER_RE.search("tB9::Oak-Bay-GI")       # Gulf Islands: t-prefix
+    assert MARKER_RE.search("vA1::Lund-DS")          # Desolation: v-prefix (was missed)
+    assert not MARKER_RE.search("t::Gulf-Islands-cover-GI")  # cover: no section+number
 
 
 def test_candidate_pages_keeps_coord_or_marker_pages():

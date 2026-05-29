@@ -6,8 +6,11 @@ import re
 
 # e.g. 48°21.50'N — degrees, decimal minutes, hemisphere
 COORD_RE = re.compile(r"\d{1,3}°\d{1,2}\.\d+[''][NSEW]")
-# e.g. tB9::Oak-Bay-GI — the e-book's per-anchorage page marker
-MARKER_RE = re.compile(r"t[A-Z]+\d+::")
+# e.g. tB9::Oak-Bay-GI (Gulf Islands) or vA1::Lund-DS (Desolation) — the e-book's
+# per-anchorage page marker. The leading prefix letter varies by book (t, v, …);
+# what's constant is <section-letter><number>:: . Cover/TOC markers like
+# `t::Gulf-Islands-cover-GI` have no section+number and are correctly excluded.
+MARKER_RE = re.compile(r"[a-z]+[A-Z]+\d+::")
 
 
 def candidate_pages(pages: list[str]) -> list[tuple[int, str]]:
