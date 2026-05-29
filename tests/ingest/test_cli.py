@@ -102,6 +102,33 @@ def test_run_ingest_force_reprocesses_covered_pages(tmp_path, monkeypatch):
     assert len(calls) == 1
 
 
+def test_run_ingest_force_clears_stale_records(tmp_path, monkeypatch):
+    pdf_file = tmp_path / "book.pdf"
+    pdf_file.write_bytes(b"%PDF fake")
+    vault = tmp_path / "vault"
+    source = "TestPilot — X 2025"
+
+    # A stale record whose name the re-run will NOT reproduce — must be removed.
+    from pilotbook_mcp.ingest.writer import write_anchorage
+    write_anchorage(vault, Anchorage(name="Stale Name", source=source, lat=48.0, lon=-123.0,
+                                     exposed_sectors=["S"], confidence="high",
+                                     source_pdf="../sources/testpilot-x-2025.pdf#page=1"))
+
+    monkeypatch.setattr(cli.pdf, "extract_pages", lambda p: ["48°21.50'N P1"])
+    monkeypatch.setattr(cli.pdf, "is_scanned", lambda text, pages: False)
+    monkeypatch.setattr(cli, "_make_client", lambda: object())
+    monkeypatch.setattr(cli, "extract_record",
+                        lambda chunk, src, *, client, model: Anchorage(
+                            name="Fresh Name", source=src, lat=48.0, lon=-123.0,
+                            exposed_sectors=["SW"], confidence="high"))
+
+    cli.run_ingest(str(pdf_file), source=source, vault=str(vault), force=True)
+
+    v = Vault.load(vault)
+    assert v.get("Stale Name") is None      # cleared
+    assert v.get("Fresh Name") is not None   # re-extracted
+
+
 def test_run_index_writes_index_json_and_md(tmp_path):
     vault = tmp_path / "vault"
     from pilotbook_mcp.ingest.writer import write_anchorage

@@ -8,6 +8,7 @@ import json
 import logging
 import os
 import re
+import shutil
 from pathlib import Path
 
 logger = logging.getLogger(__name__)
@@ -54,6 +55,12 @@ def run_ingest(pdf_path: str, source: str, vault: str | None = None, force: bool
         "pages": page_count, "ingested": _dt.date.today().isoformat(),
     })
 
+    if force:
+        # Clear this book's existing records so re-extraction can't leave stale
+        # duplicates behind when the model names an anchorage slightly differently.
+        book_dir = root / "anchorages" / slugify(source)
+        if book_dir.is_dir():
+            shutil.rmtree(book_dir)
     covered = set() if force else _covered_pages(root, source)
     client = _make_client()
     written = low = failed = skipped = 0
