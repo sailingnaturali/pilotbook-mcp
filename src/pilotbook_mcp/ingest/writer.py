@@ -43,7 +43,8 @@ def update_manifest(vault: str | Path, entry: dict) -> None:
 
 
 def write_anchorage(vault: str | Path, anchorage: Anchorage) -> Path:
-    anchor_dir = Path(vault) / "anchorages"
+    book = slugify(anchorage.source)
+    anchor_dir = Path(vault) / "anchorages" / book
     anchor_dir.mkdir(parents=True, exist_ok=True)
     path = anchor_dir / f"{slugify(anchorage.name)}.md"
     path.write_text(anchorage.to_markdown(), encoding="utf-8")

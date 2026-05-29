@@ -27,7 +27,7 @@ class Vault:
         anchorages: list[Anchorage] = []
         anchor_dir = root / "anchorages"
         if anchor_dir.is_dir():
-            for md in sorted(anchor_dir.glob("*.md")):
+            for md in sorted(anchor_dir.rglob("*.md")):
                 anchorages.append(Anchorage.from_markdown(md.read_text(encoding="utf-8")))
         return cls(root=root, anchorages=anchorages)
 

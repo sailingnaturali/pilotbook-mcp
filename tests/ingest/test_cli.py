@@ -42,11 +42,17 @@ def test_run_review_flags_low_confidence(tmp_path, capsys):
     assert "Good" not in out
 
 
-def test_run_index_writes_index_json(tmp_path):
+def test_run_index_writes_index_json_and_md(tmp_path):
     vault = tmp_path / "vault"
     from pilotbook_mcp.ingest.writer import write_anchorage
-    write_anchorage(vault, Anchorage(name="A", source="X", lat=48.0, lon=-123.0, exposed_sectors=["N"]))
+    write_anchorage(vault, Anchorage(name="A", source="X", lat=48.0, lon=-123.0,
+                                     exposed_sectors=["N"], region="[[Gulf Islands]]"))
     cli.run_index(str(vault))
     idx = json.loads((vault / "index.json").read_text())
     assert idx[0]["name"] == "A"
     assert idx[0]["exposed_sectors"] == ["N"]
+    assert idx[0]["region"] == "Gulf Islands"
+    assert idx[0]["path"] == "anchorages/x/a.md"
+    index_md = (vault / "INDEX.md").read_text()
+    assert "## Gulf Islands" in index_md
+    assert "[A](anchorages/x/a.md)" in index_md

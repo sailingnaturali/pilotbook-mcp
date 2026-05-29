@@ -39,7 +39,7 @@ def test_write_anchorage_creates_slugged_md(tmp_path):
     vault = tmp_path / "vault"
     a = Anchorage(name="Test Cove", source="X", lat=48.5, lon=-123.4, exposed_sectors=["SW"])
     path = write_anchorage(vault, a)
-    assert path == vault / "anchorages" / "test-cove.md"
+    assert path == vault / "anchorages" / "x" / "test-cove.md"
     reparsed = Anchorage.from_markdown(path.read_text(encoding="utf-8"))
     assert reparsed.name == "Test Cove"
     assert reparsed.exposed_sectors == ["SW"]
