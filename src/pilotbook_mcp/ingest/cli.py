@@ -35,8 +35,9 @@ def _covered_pages(root: Path, source: str) -> set[int]:
 
 
 def _valid_coords(lat, lon) -> bool:
-    return (lat is not None and lon is not None
-            and -90 <= lat <= 90 and -180 <= lon <= 180)
+    if lat is None or lon is None:
+        return True  # coordless anchorage is allowed — just won't be geo-searchable
+    return -90 <= lat <= 90 and -180 <= lon <= 180
 
 
 def _make_client():

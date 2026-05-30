@@ -12,6 +12,16 @@ def test_haversine_known_distance():
     assert abs(d - 1.0) < 0.02
 
 
+def test_within_radius_skips_coordless_anchorages():
+    here = (48.50, -123.40)
+    anchorages = [
+        Anchorage(name="Has Coords", source="X", lat=48.51, lon=-123.40),
+        Anchorage(name="No Coords", source="X"),  # lat/lon None
+    ]
+    result = within_radius(anchorages, *here, radius_nm=10)
+    assert [a.name for a, _ in result] == ["Has Coords"]
+
+
 def test_within_radius_filters_and_sorts_by_distance():
     here = (48.50, -123.40)
     anchorages = [

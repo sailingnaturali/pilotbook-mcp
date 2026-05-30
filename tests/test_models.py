@@ -75,6 +75,14 @@ def test_source_pdf_round_trips():
     assert reparsed.source_pdf == "../sources/s.pdf#page=5"
 
 
+def test_coordless_anchorage_round_trips():
+    a = Anchorage(name="Boughey Bay", source="S")  # no lat/lon
+    assert a.lat is None and a.lon is None
+    r = Anchorage.from_markdown(a.to_markdown())
+    assert r.name == "Boughey Bay"
+    assert r.lat is None and r.lon is None
+
+
 def test_facilities_fields_round_trip():
     a = Anchorage(name="Marina Cove", source="S", lat=1.0, lon=2.0,
                   shore_power="30A", pumpout=True, potable_water=True, garbage=True,

@@ -13,8 +13,8 @@ _FENCE = "---"
 class Anchorage:
     name: str
     source: str
-    lat: float
-    lon: float
+    lat: float | None = None
+    lon: float | None = None
     region: str | None = None
     source_page: int | None = None
     source_pdf: str | None = None       # vault-relative link to the page: ../sources/<file>.pdf#page=N

@@ -145,6 +145,21 @@ def test_run_ingest_skips_out_of_range_coordinates(tmp_path, monkeypatch):
     assert Vault.load(vault).get("Bad Coord") is None  # rejected, not written
 
 
+def test_run_ingest_writes_coordless_anchorage(tmp_path, monkeypatch):
+    pdf_file = tmp_path / "book.pdf"
+    pdf_file.write_bytes(b"%PDF fake")
+    vault = tmp_path / "vault"
+    monkeypatch.setattr(cli.pdf, "extract_pages", lambda p: ["wB2::Boughey-Bay-BA\nBoughey Bay."])
+    monkeypatch.setattr(cli.pdf, "is_scanned", lambda text, pages: False)
+    monkeypatch.setattr(cli, "_make_client", lambda: object())
+    monkeypatch.setattr(cli, "extract_record",
+                        lambda chunk, src, *, client, model: Anchorage(
+                            name="Boughey Bay", source=src,  # no lat/lon
+                            exposed_sectors=["N"], confidence="medium"))
+    cli.run_ingest(str(pdf_file), source="TestPilot — X 2025", vault=str(vault))
+    assert Vault.load(vault).get("Boughey Bay") is not None  # written despite no coords
+
+
 def test_run_index_writes_index_json_and_md(tmp_path):
     vault = tmp_path / "vault"
     from pilotbook_mcp.ingest.writer import write_anchorage

@@ -23,6 +23,8 @@ def within_radius(
     """Anchorages within radius_nm of (lat, lon), sorted nearest-first."""
     out: list[tuple[Anchorage, float]] = []
     for a in anchorages:
+        if a.lat is None or a.lon is None:
+            continue
         d = haversine_nm(lat, lon, a.lat, a.lon)
         if d <= radius_nm:
             out.append((a, d))
