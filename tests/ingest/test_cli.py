@@ -108,6 +108,32 @@ def test_run_review_triages_undetermined_vs_protected_vs_low_confidence(tmp_path
     assert "Solid" not in out
 
 
+def test_run_audit_writes_worklist_for_flagged_records(tmp_path, monkeypatch, capsys):
+    from pilotbook_mcp.ingest.writer import write_anchorage
+    vault = tmp_path / "vault"
+    source = "TestPilot — X 2025"
+    write_anchorage(vault, Anchorage(name="Bad Sectors", source=source, lat=48.0, lon=-123.0,
+                                     exposed_sectors=["W"], prose="Protection from west winds."))
+    write_anchorage(vault, Anchorage(name="Fine", source=source, lat=48.1, lon=-123.0,
+                                     exposed_sectors=["S"], prose="Open to southerly winds."))
+    monkeypatch.setattr(cli, "_make_client", lambda: object())
+
+    def fake_audit(a, *, client, model):
+        if a.name == "Bad Sectors":
+            return {"agree": False, "suggested_sectors": [], "audit_confidence": "high",
+                    "reason": "protection from west → W protected"}
+        return {"agree": True, "audit_confidence": "high", "reason": "matches"}
+    monkeypatch.setattr(cli, "audit_record", fake_audit)
+
+    cli.run_audit(source, vault=str(vault))
+    worklist = (vault / "audits" / "testpilot-x-2025.audit.md")
+    assert worklist.exists()
+    text = worklist.read_text()
+    assert "1 flagged" in text
+    assert "Bad Sectors" in text
+    assert "Fine" not in text  # agreed records aren't listed
+
+
 def test_run_index_empty_vault_warns_and_writes_nothing(tmp_path, capsys):
     vault = tmp_path / "empty-vault"
     vault.mkdir()

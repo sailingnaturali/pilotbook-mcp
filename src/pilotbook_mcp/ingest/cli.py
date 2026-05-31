@@ -14,6 +14,7 @@ from pathlib import Path
 logger = logging.getLogger(__name__)
 
 from pilotbook_mcp.ingest import pdf
+from pilotbook_mcp.ingest.audit import audit_record, format_worklist
 from pilotbook_mcp.ingest.extract import extract_record
 from pilotbook_mcp.ingest.segment import candidate_pages
 from pilotbook_mcp.ingest.writer import archive_source, sha256_file, slugify, update_manifest, write_anchorage
@@ -163,6 +164,36 @@ def run_index(vault: str | None = None) -> None:
     print(f"Wrote index.json + INDEX.md ({len(idx)} anchorages) to {v.root}")
 
 
+def run_audit(source: str, vault: str | None = None, model: str = "claude-sonnet-4-6") -> None:
+    """LLM-audit one book's exposed_sectors against its prose; write a triage worklist."""
+    v = Vault.load(Path(vault) if vault else None)
+    book = slugify(source)
+    records = [a for a in v.anchorages if slugify(a.source) == book]
+    if not records:
+        print(f"No anchorages for source {source!r} in {v.root.resolve()} — check --source / PILOTBOOK_VAULT_PATH.")
+        return
+    client = _make_client()
+    flagged, errored = [], 0
+    for a in records:
+        try:
+            res = audit_record(a, client=client, model=model)
+        except Exception as exc:  # one bad record must not abort the audit
+            errored += 1
+            logger.warning("audit failed on %s: %s", a.name, exc)
+            continue
+        if res and not res.get("agree"):
+            flagged.append({"name": a.name, "current": a.exposed_sectors,
+                            "suggested": res.get("suggested_sectors"),
+                            "audit_confidence": res.get("audit_confidence"),
+                            "reason": res.get("reason")})
+    audits_dir = v.root / "audits"
+    audits_dir.mkdir(exist_ok=True)
+    path = audits_dir / f"{book}.audit.md"
+    path.write_text(format_worklist(source, flagged), encoding="utf-8")
+    print(f"Audited {len(records)} records for {source} — {len(flagged)} flagged, {errored} errored. "
+          f"Worklist: {path}")
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(prog="pilotbook")
     sub = parser.add_subparsers(dest="cmd", required=True)
@@ -180,6 +211,11 @@ def main() -> None:
     p_idx = sub.add_parser("index", help="write index.json for the runtime server")
     p_idx.add_argument("--vault", default=None)
 
+    p_aud = sub.add_parser("audit", help="LLM-audit a book's exposed_sectors against its prose")
+    p_aud.add_argument("--source", required=True, help='e.g. "SalishSeaPilot — Desolation Sound 2025"')
+    p_aud.add_argument("--vault", default=None)
+    p_aud.add_argument("--model", default="claude-sonnet-4-6")
+
     args = parser.parse_args()
     if args.cmd == "ingest":
         run_ingest(args.pdf, source=args.source, vault=args.vault, force=args.force)
@@ -187,3 +223,5 @@ def main() -> None:
         run_review(args.vault)
     elif args.cmd == "index":
         run_index(args.vault)
+    elif args.cmd == "audit":
+        run_audit(args.source, vault=args.vault, model=args.model)
