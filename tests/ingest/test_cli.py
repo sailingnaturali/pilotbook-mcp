@@ -85,19 +85,26 @@ def test_run_review_empty_vault_warns_with_path(tmp_path, capsys):
     assert "empty-vault" in out  # resolved path is shown
 
 
-def test_run_review_triages_missing_vs_low_confidence(tmp_path, capsys):
+def test_run_review_triages_undetermined_vs_protected_vs_low_confidence(tmp_path, capsys):
     from pilotbook_mcp.ingest.writer import write_anchorage
     vault = tmp_path / "vault"
-    write_anchorage(vault, Anchorage(name="No Sectors", source="X", lat=48.0, lon=-123.0,
+    # empty + low → undetermined (flag)
+    write_anchorage(vault, Anchorage(name="Undetermined", source="X", lat=48.0, lon=-123.0,
+                                     exposed_sectors=[], confidence="low"))
+    # empty + high → confirmed fully protected (NOT flagged)
+    write_anchorage(vault, Anchorage(name="Confirmed Protected", source="X", lat=48.05, lon=-123.0,
                                      exposed_sectors=[], confidence="high"))
+    # has sectors + low → low confidence (flag)
     write_anchorage(vault, Anchorage(name="Soft Call", source="X", lat=48.1, lon=-123.0,
                                      exposed_sectors=["SW"], confidence="low"))
+    # has sectors + high → solid (not flagged)
     write_anchorage(vault, Anchorage(name="Solid", source="X", lat=48.2, lon=-123.0,
                                      exposed_sectors=["SW"], confidence="high"))
     cli.run_review(str(vault))
     out = capsys.readouterr().out
-    assert "missing exposed_sectors" in out and "No Sectors" in out
+    assert "undetermined exposure" in out and "Undetermined" in out
     assert "low/medium confidence" in out and "Soft Call" in out
+    assert "Confirmed Protected" not in out  # empty + high = confirmed protected
     assert "Solid" not in out
 
 

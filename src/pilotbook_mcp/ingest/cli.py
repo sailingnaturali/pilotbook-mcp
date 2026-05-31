@@ -100,19 +100,23 @@ def run_review(vault: str | None = None) -> None:
     if not v.anchorages:
         print(f"No anchorages found in {v.root.resolve()} — is PILOTBOOK_VAULT_PATH set correctly?")
         return
-    # Triage: records with NO exposed_sectors can't be comfort-ranked at all (high
-    # impact); records that HAVE sectors but low/medium confidence are softer.
-    missing = [a for a in v.anchorages if not a.exposed_sectors]
+    # An empty exposed_sectors means "exposed to nothing" — but only `confidence: high`
+    # confirms that's a real reading (fully enclosed) vs. "couldn't tell". So:
+    #   empty + high       -> confirmed fully protected (NOT flagged)
+    #   empty + low/medium -> exposure undetermined (flag)
+    #   has sectors + low/medium -> sectors uncertain (flag)
+    undetermined = [a for a in v.anchorages if not a.exposed_sectors and a.confidence != "high"]
     low_conf = [a for a in v.anchorages if a.exposed_sectors and a.confidence != "high"]
-    if not missing and not low_conf:
+    if not undetermined and not low_conf:
         print("No anchorages need review.")
         return
-    if missing:
-        print(f"{len(missing)} anchorage(s) missing exposed_sectors (cannot be comfort-ranked):")
-        for a in sorted(missing, key=lambda x: x.name):
+    if undetermined:
+        print(f"{len(undetermined)} anchorage(s) with undetermined exposure (no exposed_sectors, "
+              f"unconfirmed — set `confidence: high` if fully protected, or add exposed_sectors):")
+        for a in sorted(undetermined, key=lambda x: x.name):
             print(f"  - {a.name} ({a.source})")
     if low_conf:
-        if missing:
+        if undetermined:
             print("")
         print(f"{len(low_conf)} anchorage(s) low/medium confidence in exposed_sectors:")
         for a in sorted(low_conf, key=lambda x: x.name):

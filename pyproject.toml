@@ -1,6 +1,6 @@
 [project]
 name = "pilotbook-mcp"
-version = "0.1.2"
+version = "0.1.3"
 description = "MCP server turning pilot-book PDFs into a queryable anchorage vault with comfort-ranked overnight recommendations"
 readme = "README.md"
 license = "MIT"
