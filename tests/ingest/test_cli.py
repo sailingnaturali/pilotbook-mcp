@@ -76,6 +76,41 @@ def test_run_review_flags_low_confidence(tmp_path, capsys):
     assert "Good" not in out
 
 
+def test_run_review_empty_vault_warns_with_path(tmp_path, capsys):
+    vault = tmp_path / "empty-vault"
+    vault.mkdir()
+    cli.run_review(str(vault))
+    out = capsys.readouterr().out
+    assert "No anchorages found" in out
+    assert "empty-vault" in out  # resolved path is shown
+
+
+def test_run_review_triages_missing_vs_low_confidence(tmp_path, capsys):
+    from pilotbook_mcp.ingest.writer import write_anchorage
+    vault = tmp_path / "vault"
+    write_anchorage(vault, Anchorage(name="No Sectors", source="X", lat=48.0, lon=-123.0,
+                                     exposed_sectors=[], confidence="high"))
+    write_anchorage(vault, Anchorage(name="Soft Call", source="X", lat=48.1, lon=-123.0,
+                                     exposed_sectors=["SW"], confidence="low"))
+    write_anchorage(vault, Anchorage(name="Solid", source="X", lat=48.2, lon=-123.0,
+                                     exposed_sectors=["SW"], confidence="high"))
+    cli.run_review(str(vault))
+    out = capsys.readouterr().out
+    assert "missing exposed_sectors" in out and "No Sectors" in out
+    assert "low/medium confidence" in out and "Soft Call" in out
+    assert "Solid" not in out
+
+
+def test_run_index_empty_vault_warns_and_writes_nothing(tmp_path, capsys):
+    vault = tmp_path / "empty-vault"
+    vault.mkdir()
+    cli.run_index(str(vault))
+    out = capsys.readouterr().out
+    assert "No anchorages found" in out
+    assert not (vault / "index.json").exists()
+    assert not (vault / "INDEX.md").exists()
+
+
 def test_run_ingest_force_reprocesses_covered_pages(tmp_path, monkeypatch):
     pdf_file = tmp_path / "book.pdf"
     pdf_file.write_bytes(b"%PDF fake")

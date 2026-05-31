@@ -92,19 +92,31 @@ def run_ingest(pdf_path: str, source: str, vault: str | None = None, force: bool
         if a.confidence != "high" or not a.exposed_sectors:
             low += 1
     print(f"Ingested {written} new anchorages from {source} "
-          f"({skipped} pages already done, {low} need review, {failed} errored). Vault: {root}")
+          f"({skipped} pages already done, {low} need review, {failed} errored). Vault: {root.resolve()}")
 
 
 def run_review(vault: str | None = None) -> None:
     v = Vault.load(Path(vault) if vault else None)
-    flagged = [a for a in v.anchorages if a.confidence != "high" or not a.exposed_sectors]
-    if not flagged:
+    if not v.anchorages:
+        print(f"No anchorages found in {v.root.resolve()} — is PILOTBOOK_VAULT_PATH set correctly?")
+        return
+    # Triage: records with NO exposed_sectors can't be comfort-ranked at all (high
+    # impact); records that HAVE sectors but low/medium confidence are softer.
+    missing = [a for a in v.anchorages if not a.exposed_sectors]
+    low_conf = [a for a in v.anchorages if a.exposed_sectors and a.confidence != "high"]
+    if not missing and not low_conf:
         print("No anchorages need review.")
         return
-    print(f"{len(flagged)} anchorage(s) need review:")
-    for a in flagged:
-        reason = "low/medium confidence" if a.confidence != "high" else "no exposed_sectors"
-        print(f"  - {a.name} ({a.source}) — {reason}")
+    if missing:
+        print(f"{len(missing)} anchorage(s) missing exposed_sectors (cannot be comfort-ranked):")
+        for a in sorted(missing, key=lambda x: x.name):
+            print(f"  - {a.name} ({a.source})")
+    if low_conf:
+        if missing:
+            print("")
+        print(f"{len(low_conf)} anchorage(s) low/medium confidence in exposed_sectors:")
+        for a in sorted(low_conf, key=lambda x: x.name):
+            print(f"  - {a.name} ({a.source})")
 
 
 def _anchorage_rel_path(a) -> str:
@@ -117,6 +129,9 @@ def _clean_region(region: str | None) -> str:
 
 def run_index(vault: str | None = None) -> None:
     v = Vault.load(Path(vault) if vault else None)
+    if not v.anchorages:
+        print(f"No anchorages found in {v.root.resolve()} — is PILOTBOOK_VAULT_PATH set? (nothing indexed)")
+        return
 
     # Machine index for the runtime server.
     idx = [{"name": a.name, "lat": a.lat, "lon": a.lon, "source": a.source,
