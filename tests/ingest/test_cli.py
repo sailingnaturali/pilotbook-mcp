@@ -119,10 +119,11 @@ def test_run_audit_writes_worklist_for_flagged_records(tmp_path, monkeypatch, ca
     monkeypatch.setattr(cli, "_make_client", lambda: object())
 
     def fake_audit(a, *, client, model):
-        if a.name == "Bad Sectors":
-            return {"agree": False, "suggested_sectors": [], "audit_confidence": "high",
-                    "reason": "protection from west → W protected"}
-        return {"agree": True, "audit_confidence": "high", "reason": "matches"}
+        if a.name == "Bad Sectors":   # current [W] vs prose-derived exposed_to [] -> flagged in code
+            return {"protected_from": ["W"], "exposed_to": [], "evidence": "",
+                    "audit_confidence": "high"}
+        return {"protected_from": [], "exposed_to": ["S"], "evidence": "open to southerly winds",
+                "audit_confidence": "high"}   # current [S] == exposed_to [S] -> agrees
     monkeypatch.setattr(cli, "audit_record", fake_audit)
 
     cli.run_audit(source, vault=str(vault))

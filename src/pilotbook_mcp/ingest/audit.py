@@ -1,12 +1,15 @@
 """LLM exposure auditor — a curation aid that re-reads an anchorage's prose and
 judges its `exposed_sectors`, separate from extraction.
 
-It uses the same Anthropic structured tool-use pattern as `extract.py`, but its job
-is to *check* an existing record rather than create one. Calibration note: its
-**flags have good recall** (it catches over-reach the `confidence` field misses), but
-its **suggested sectors are a starting point, not truth** — it can still invert
-"protection from X" into exposure. Treat output as a worklist for a human, and refine
-`_AUDIT_INSTRUCTIONS` as new misread patterns surface.
+Design (v2): rather than ask the model for a free-form "is this right?" verdict — which
+let it invert "protection from X" into exposure — it must classify, from the prose ONLY,
+which sectors are `protected_from` and which are `exposed_to`, with a verbatim `evidence`
+quote. The suggestion is `exposed_to`; agreement with the current record is computed in
+CODE (set equality), not judged by the model. This makes the inversion error structurally
+hard and gives every flag a quote a human can verify at a glance.
+
+Calibration still holds: flags have good recall; suggestions are a starting point, not
+truth. Refine `_AUDIT_INSTRUCTIONS` as new misread patterns surface.
 """
 
 from __future__ import annotations
@@ -17,35 +20,49 @@ _8POINT = ["N", "NE", "E", "SE", "S", "SW", "W", "NW"]
 
 _AUDIT_INSTRUCTIONS = """You audit one anchorage's wind/swell EXPOSURE against its pilot-book prose.
 `exposed_sectors` = the 8-point compass directions the anchorage is OPEN TO — wind or swell FROM
-those directions makes it uncomfortable. Protected directions are NOT listed.
+those directions makes it uncomfortable.
 
-Judge whether the CURRENT exposed_sectors match the prose. Rules (these are where past audits went wrong):
-- "protection/shelter from X" -> X is PROTECTED (NOT exposed).
-- "little/no/limited protection from X" -> X IS exposed (negation — read it carefully).
-- "good in all but X" / "all but X winds" -> exposed to X only.
-- "some shelter from X tucked behind <feature>" -> generally still exposed to X (conditional lee).
-- A direction named only as an anchoring location ("anchor along the SE shore", "depths off the NE shore")
-  is NOT an exposure — ignore it.
-- The prose often describes OTHER nearby/overflow/sub-anchorages — judge ONLY the named anchorage; ignore the others.
-- Empty exposed_sectors is CORRECT when the anchorage is fully enclosed / protected from all directions,
-  or when discomfort comes from current/eddies/boat-wake rather than wind.
-- Only mark disagree when the prose CLEARLY contradicts the list. If the prose is silent on exposure, AGREE — do not invent.
-Call audit_exposure with your verdict."""
+Read the prose for THIS anchorage and report two lists, derived ONLY from what the text explicitly says:
+- protected_from: sectors the prose says are sheltered. Triggers: "protection/shelter from X",
+  "protected from X", "good in X winds", "in the lee of ... from X".
+- exposed_to: sectors the prose says wind or swell ENTERS from. Triggers: "open to X", "exposed to X",
+  "X winds/swell enter/reach/roll in", "little/no/limited protection from X" (NEGATION), "good in all
+  but X" / "all but X" (= exposed to X), and CONDITIONAL LEE — "better/some protection from X can be
+  found in the lee of / behind <feature>", "X winds, though tucked behind <feature> is comfortable"
+  (the main anchorage IS exposed to X; the feature only partly shelters → put X in exposed_to).
+
+Hard rules — past audits failed exactly here:
+1. "protection/shelter from X" means X is PROTECTED. Put X in protected_from. NEVER put it in exposed_to.
+   Worked example: "good protection from SE winds" -> protected_from:["SE"], exposed_to:[]. NOT exposed_to:["SE"].
+2. A compass word used only to LOCATE anchoring ("anchor along the SE shore", "depths off the NE shore",
+   "moorings near the head") is neither protected nor exposed — ignore it.
+3. The prose often describes several lettered sub-spots (q, r, s) or nearby/overflow anchorages.
+   exposed_to is the UNION of exposures across the sub-spots OF THIS anchorage; ignore wholly separate anchorages.
+4. "protection in most/all winds", "secure in most conditions", "well-protected" — these name NO direction.
+   exposed_to is []. Do not guess a direction.
+5. Discomfort from current, eddies, tide, boat-wake or ferry-wake is NOT wind exposure — it adds nothing to exposed_to.
+6. If the prose names no exposure direction, exposed_to is [] and evidence is "". Do not infer exposure from
+   geography, the anchorage's orientation, or vibes — only from explicit words.
+
+evidence: quote the exact prose phrase(s) that set exposed_to, or "" if none.
+Call audit_exposure."""
 
 AUDIT_TOOL = {
     "name": "audit_exposure",
-    "description": "Report whether the listed exposed_sectors match the anchorage's prose.",
+    "description": "Classify the prose's stated protection/exposure for this anchorage.",
     "input_schema": {
         "type": "object",
         "properties": {
-            "agree": {"type": "boolean",
-                      "description": "true if the current exposed_sectors are correct per the prose"},
-            "suggested_sectors": {"type": "array", "items": {"type": "string", "enum": _8POINT},
-                                  "description": "corrected sectors (only if agree=false); empty list = fully protected"},
+            "protected_from": {"type": "array", "items": {"type": "string", "enum": _8POINT},
+                               "description": "sectors the prose explicitly says are sheltered"},
+            "exposed_to": {"type": "array", "items": {"type": "string", "enum": _8POINT},
+                           "description": "sectors the prose explicitly says weather enters from; "
+                                          "this becomes the suggested exposed_sectors"},
+            "evidence": {"type": "string",
+                         "description": 'verbatim prose phrase(s) supporting exposed_to, or "" if none'},
             "audit_confidence": {"type": "string", "enum": ["high", "medium", "low"]},
-            "reason": {"type": "string", "description": "one sentence citing the prose"},
         },
-        "required": ["agree", "audit_confidence", "reason"],
+        "required": ["protected_from", "exposed_to", "evidence", "audit_confidence"],
     },
     "cache_control": {"type": "ephemeral"},
 }
@@ -57,10 +74,11 @@ def build_audit_prompt() -> list[dict]:
 
 
 def audit_record(anchorage: Anchorage, *, client, model: str = "claude-sonnet-4-6") -> dict | None:
-    """Ask the model whether `anchorage.exposed_sectors` matches its prose.
+    """Classify an anchorage's exposure from its prose.
 
-    Returns the tool input dict ({agree, suggested_sectors?, audit_confidence, reason})
-    or None if no verdict came back.
+    Returns the tool input dict ({protected_from, exposed_to, evidence, audit_confidence})
+    or None if no verdict came back. The caller decides agreement by comparing
+    `exposed_to` to the record's current `exposed_sectors`.
     """
     user = (f"Anchorage: {anchorage.name}\n"
             f"Current exposed_sectors: {anchorage.exposed_sectors}\n\n"
@@ -79,28 +97,38 @@ def audit_record(anchorage: Anchorage, *, client, model: str = "claude-sonnet-4-
     return None
 
 
+def disagrees(current: list[str] | None, verdict: dict) -> bool:
+    """True when the prose-derived exposed_to differs from the record's current sectors."""
+    return set(current or []) != set(verdict.get("exposed_to") or [])
+
+
 def format_worklist(source: str, flagged: list[dict]) -> str:
-    """Render the auditor's disagreements as a triage markdown table."""
+    """Render the auditor's disagreements as a triage markdown table.
+
+    Each flagged dict carries: name, current, suggested (=exposed_to), protected_from,
+    evidence, audit_confidence.
+    """
     order = {"high": 0, "medium": 1, "low": 2}
     rows = sorted(flagged, key=lambda r: order.get(r.get("audit_confidence"), 3))
     lines = [
         f"# Exposure audit — {source}",
         "",
-        "Auto-generated by `pilotbook audit`. The auditor's **flags** have real recall, but its "
-        "**suggested sectors are a starting point, not truth** — verify each against the prose before "
-        "applying. Empty suggestion = fully protected.",
+        "Auto-generated by `pilotbook audit`. The model classifies, from the prose only, which "
+        "sectors are protected vs exposed; `suggested` = its `exposed_to`, and the flag is computed "
+        "in code (set difference). **Verify each `evidence` quote against the record before applying** "
+        "— recall is good, but a quote can still be misread. Empty suggested = fully protected.",
         "",
         f"{len(flagged)} flagged.",
         "",
-        "| audit | anchorage | current | suggested | why |",
-        "|-------|-----------|---------|-----------|-----|",
+        "| audit | anchorage | current | suggested | protected_from | evidence |",
+        "|-------|-----------|---------|-----------|----------------|----------|",
     ]
     for r in rows:
-        cur = r.get("current") or []
-        sug = r.get("suggested")
-        sug = "—" if sug is None else (sug or "[] (fully protected)")
-        reason = (r.get("reason") or "").replace("|", "\\|")
+        sug = r.get("suggested") or []
+        sug = "[] (fully protected)" if not sug else str(sug)
+        prot = r.get("protected_from") or []
+        ev = (r.get("evidence") or "").replace("|", "\\|").replace("\n", " ").strip() or "—"
         lines.append(f"| {r.get('audit_confidence','?')} | {r.get('name','?')} | "
-                     f"{cur} | {sug} | {reason} |")
+                     f"{r.get('current') or []} | {sug} | {prot} | {ev} |")
     lines.append("")
     return "\n".join(lines)

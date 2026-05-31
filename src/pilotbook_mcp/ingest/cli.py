@@ -14,7 +14,7 @@ from pathlib import Path
 logger = logging.getLogger(__name__)
 
 from pilotbook_mcp.ingest import pdf
-from pilotbook_mcp.ingest.audit import audit_record, format_worklist
+from pilotbook_mcp.ingest.audit import audit_record, disagrees, format_worklist
 from pilotbook_mcp.ingest.extract import extract_record
 from pilotbook_mcp.ingest.segment import candidate_pages
 from pilotbook_mcp.ingest.writer import archive_source, sha256_file, slugify, update_manifest, write_anchorage
@@ -181,11 +181,12 @@ def run_audit(source: str, vault: str | None = None, model: str = "claude-sonnet
             errored += 1
             logger.warning("audit failed on %s: %s", a.name, exc)
             continue
-        if res and not res.get("agree"):
+        if res and disagrees(a.exposed_sectors, res):
             flagged.append({"name": a.name, "current": a.exposed_sectors,
-                            "suggested": res.get("suggested_sectors"),
-                            "audit_confidence": res.get("audit_confidence"),
-                            "reason": res.get("reason")})
+                            "suggested": res.get("exposed_to") or [],
+                            "protected_from": res.get("protected_from") or [],
+                            "evidence": res.get("evidence") or "",
+                            "audit_confidence": res.get("audit_confidence")})
     audits_dir = v.root / "audits"
     audits_dir.mkdir(exist_ok=True)
     path = audits_dir / f"{book}.audit.md"
