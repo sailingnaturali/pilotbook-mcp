@@ -15,6 +15,7 @@ logger = logging.getLogger(__name__)
 
 from pilotbook_mcp.ingest import pdf
 from pilotbook_mcp.ingest.audit import audit_record, disagrees, format_worklist
+from pilotbook_mcp.ingest.cleanup import clean_file_text, examples
 from pilotbook_mcp.ingest.extract import extract_record
 from pilotbook_mcp.ingest.segment import candidate_pages
 from pilotbook_mcp.ingest.writer import archive_source, sha256_file, slugify, update_manifest, write_anchorage
@@ -196,6 +197,43 @@ def run_audit(source: str, vault: str | None = None, model: str = "claude-sonnet
           f"Worklist: {path}")
 
 
+def run_clean_prose(source: str | None = None, vault: str | None = None, apply: bool = False) -> None:
+    """Strip chartlet sub-spot letters (q, r, s…) from prose bodies. Dry-run unless apply."""
+    v = Vault.load(Path(vault) if vault else None)
+    anchor_dir = v.root / "anchorages"
+    if not anchor_dir.is_dir():
+        print(f"No anchorages/ in {v.root.resolve()} — is PILOTBOOK_VAULT_PATH set?")
+        return
+    files = sorted(anchor_dir.rglob("*.md"))
+    if source:
+        book = slugify(source)
+        files = [f for f in files if f.parent.name == book]
+    changed = total = 0
+    previews: list[str] = []
+    for f in files:
+        text = f.read_text(encoding="utf-8")
+        new, n = clean_file_text(text)
+        if not n:
+            continue
+        changed += 1
+        total += n
+        if apply:
+            f.write_text(new, encoding="utf-8")
+        elif len(previews) < 12:
+            ex = examples(text.split("---", 2)[-1])
+            if ex:
+                previews.append(f"  {f.parent.name}/{f.name}: “{ex[0]}…”")
+    if apply:
+        print(f"Applied: stripped {total} sub-spot letter(s) across {changed} file(s).")
+    else:
+        print(f"DRY RUN — would strip {total} sub-spot letter(s) across {changed} file(s):")
+        for p in previews:
+            print(p)
+        if changed > len(previews):
+            print(f"  … and {changed - len(previews)} more file(s).")
+        print("Re-run with --apply to write.")
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(prog="pilotbook")
     sub = parser.add_subparsers(dest="cmd", required=True)
@@ -218,6 +256,11 @@ def main() -> None:
     p_aud.add_argument("--vault", default=None)
     p_aud.add_argument("--model", default="claude-sonnet-4-6")
 
+    p_cln = sub.add_parser("clean-prose", help="strip chartlet sub-spot letters (q,r,s…) from prose bodies")
+    p_cln.add_argument("--source", default=None, help="limit to one book (default: all books)")
+    p_cln.add_argument("--vault", default=None)
+    p_cln.add_argument("--apply", action="store_true", help="write changes (default: dry run)")
+
     args = parser.parse_args()
     if args.cmd == "ingest":
         run_ingest(args.pdf, source=args.source, vault=args.vault, force=args.force)
@@ -227,3 +270,5 @@ def main() -> None:
         run_index(args.vault)
     elif args.cmd == "audit":
         run_audit(args.source, vault=args.vault, model=args.model)
+    elif args.cmd == "clean-prose":
+        run_clean_prose(source=args.source, vault=args.vault, apply=args.apply)
