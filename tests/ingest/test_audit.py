@@ -46,7 +46,7 @@ def test_audit_tool_schema_is_structured():
     assert AUDIT_TOOL["name"] == "audit_exposure"
     assert AUDIT_TOOL["cache_control"] == {"type": "ephemeral"}
     assert AUDIT_TOOL["input_schema"]["required"] == [
-        "protected_from", "exposed_to", "evidence", "audit_confidence"]
+        "protected_from", "exposed_to", "undirected_exposure", "evidence", "audit_confidence"]
 
 
 def test_audit_record_returns_classification_and_sends_prose():
@@ -71,6 +71,17 @@ def test_disagrees_compares_current_to_exposed_to_in_code():
     # order-insensitive
     assert disagrees(["S", "W"], {"exposed_to": ["W", "S"]}) is False
     assert disagrees(None, {"exposed_to": ["S"]}) is True
+
+
+def test_disagrees_undirected_exposure():
+    # "open to weather" (no compass) + record already has sectors -> NOT flagged
+    assert disagrees(["N", "NE", "E", "SE", "S", "SW", "W", "NW"],
+                     {"exposed_to": [], "undirected_exposure": True}) is False
+    # undirected exposure but record claims fully protected ([]) -> flag it
+    assert disagrees([], {"exposed_to": [], "undirected_exposure": True}) is True
+    # undirected BUT a direction is also named -> compare normally (don't suppress real fixes)
+    assert disagrees(["S"], {"exposed_to": ["S", "SW"], "undirected_exposure": True}) is True
+    assert disagrees(["S"], {"exposed_to": ["S"], "undirected_exposure": True}) is False
 
 
 def test_format_worklist_sorts_by_confidence_and_shows_evidence():

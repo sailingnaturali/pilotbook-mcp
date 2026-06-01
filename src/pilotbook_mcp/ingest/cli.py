@@ -185,6 +185,7 @@ def run_audit(source: str, vault: str | None = None, model: str = "claude-sonnet
             flagged.append({"name": a.name, "current": a.exposed_sectors,
                             "suggested": res.get("exposed_to") or [],
                             "protected_from": res.get("protected_from") or [],
+                            "undirected_exposure": res.get("undirected_exposure", False),
                             "evidence": res.get("evidence") or "",
                             "audit_confidence": res.get("audit_confidence")})
     audits_dir = v.root / "audits"

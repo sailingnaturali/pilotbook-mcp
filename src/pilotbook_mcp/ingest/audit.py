@@ -43,8 +43,13 @@ Hard rules — past audits failed exactly here:
 5. Discomfort from current, eddies, tide, boat-wake or ferry-wake is NOT wind exposure — it adds nothing to exposed_to.
 6. If the prose names no exposure direction, exposed_to is [] and evidence is "". Do not infer exposure from
    geography, the anchorage's orientation, or vibes — only from explicit words.
+7. UNDIRECTED exposure — if the prose says the anchorage is broadly exposed but names NO usable compass
+   direction ("open to weather", "open to wind and sea", general "exposed", "rolly", "strong inflow/outflow
+   winds", "acceptable/only in settled conditions"), set undirected_exposure=true. Still fill exposed_to with
+   only the directions (if any) that ARE explicitly named. Do NOT conclude the anchorage is fully protected.
+   Otherwise set undirected_exposure=false.
 
-evidence: quote the exact prose phrase(s) that set exposed_to, or "" if none.
+evidence: quote the exact prose phrase(s) that set exposed_to or undirected_exposure, or "" if none.
 Call audit_exposure."""
 
 AUDIT_TOOL = {
@@ -58,11 +63,14 @@ AUDIT_TOOL = {
             "exposed_to": {"type": "array", "items": {"type": "string", "enum": _8POINT},
                            "description": "sectors the prose explicitly says weather enters from; "
                                           "this becomes the suggested exposed_sectors"},
+            "undirected_exposure": {"type": "boolean",
+                                    "description": "true if the prose says the anchorage is broadly "
+                                                   "exposed/rolly/open-to-weather WITHOUT a usable compass direction"},
             "evidence": {"type": "string",
-                         "description": 'verbatim prose phrase(s) supporting exposed_to, or "" if none'},
+                         "description": 'verbatim prose phrase(s) supporting exposed_to/undirected_exposure, or "" if none'},
             "audit_confidence": {"type": "string", "enum": ["high", "medium", "low"]},
         },
-        "required": ["protected_from", "exposed_to", "evidence", "audit_confidence"],
+        "required": ["protected_from", "exposed_to", "undirected_exposure", "evidence", "audit_confidence"],
     },
     "cache_control": {"type": "ephemeral"},
 }
@@ -98,8 +106,19 @@ def audit_record(anchorage: Anchorage, *, client, model: str = "claude-sonnet-4-
 
 
 def disagrees(current: list[str] | None, verdict: dict) -> bool:
-    """True when the prose-derived exposed_to differs from the record's current sectors."""
-    return set(current or []) != set(verdict.get("exposed_to") or [])
+    """True when the verdict contradicts the record's current sectors.
+
+    Normal case: flag when the prose-derived `exposed_to` differs from `current`.
+    Undirected exposure ("open to weather", "strong inflow winds" — broadly exposed,
+    no compass): the existing sectors are a reasonable stand-in for that, so only flag
+    when the record claims full protection (empty) while the prose says it's exposed.
+    """
+    exposed_to = set(verdict.get("exposed_to") or [])
+    if verdict.get("undirected_exposure") and not exposed_to:
+        # Broadly exposed, no compass to offer: the existing sectors are a fine stand-in,
+        # so only flag when the record wrongly claims full protection (empty).
+        return not (current or [])
+    return set(current or []) != exposed_to
 
 
 def format_worklist(source: str, flagged: list[dict]) -> str:
@@ -125,7 +144,10 @@ def format_worklist(source: str, flagged: list[dict]) -> str:
     ]
     for r in rows:
         sug = r.get("suggested") or []
-        sug = "[] (fully protected)" if not sug else str(sug)
+        if not sug:
+            sug = "exposed (undirected)" if r.get("undirected_exposure") else "[] (fully protected)"
+        else:
+            sug = str(sug)
         prot = r.get("protected_from") or []
         ev = (r.get("evidence") or "").replace("|", "\\|").replace("\n", " ").strip() or "—"
         lines.append(f"| {r.get('audit_confidence','?')} | {r.get('name','?')} | "
