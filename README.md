@@ -11,7 +11,7 @@ anchorage's wind/swell exposure against a forecast.
   anchorage records via the Claude API.
 
 This engine ships **no book content**. Point it at a vault with
-`PILOTBOOK_VAULT_PATH`. See `docs/` in the planning repo for the design spec.
+`PILOTBOOK_VAULT_PATH`.
 
 ## Install
 
