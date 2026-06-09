@@ -1,0 +1,80 @@
+queries:
+  # WCVI — Kyuquot Sound
+  - query: secluded inner cove with a cliff backdrop and good mud holding in Kyuquot Sound where you can really switch off
+    expect: ["Dixie Cove"]
+
+  # WCVI — Hot Springs / Tootoo
+  - query: quiet uncrowded cove near the hot springs boardwalk where I can land the dinghy on a sandy beach
+    expect: ["Tootoo Cove"]
+
+  # WCVI — Hot Springs Cove itself
+  - query: soak in geothermal pools after the tourist boats leave, walk a boardwalk through old-growth on the west coast of Vancouver Island
+    expect: ["Hot Springs Cove"]
+
+  # WCVI — Nuchatlitz
+  - query: kayaker-friendly marine park inside islet maze on WCVI with tricky winding entrance but excellent all-round protection
+    expect: ["Nuchatlitz Provincial Marine Park – Inside Anchorage"]
+
+  # WCVI — Louie Bay
+  - query: anchorage with a ship wreck on the beach and a tidal lagoon to paddle into on Vancouver Island's outer coast
+    expect: ["Louie Bay"]
+
+  # Broughton — Blunden Harbour
+  - query: historic First Nations harbour with Emily Carr connection, explore a tidal lagoon at the right current, good protection except northwest
+    expect: ["Blunden Harbour"]
+
+  # Broughton — Booker Lagoon
+  - query: northwest corner of a lagoon anchorage in the Broughtons where old fish farm debris means you should use a buoy on your anchor
+    expect: ["Booker Lagoon – q (NW anchorage)"]
+
+  # Broughton — Burdwood Group
+  - query: island group at the hub of the Broughtons with an ancient shell midden to explore by campfire
+    expect: ["Burdwood Group"]
+
+  # Broughton — Allison Harbour
+  - query: long fog-friendly inlet in the Broughtons with easy obstruction-free entry, good holding at the head, sand beaches to explore by dinghy
+    expect: ["Allison Harbour"]
+
+  # Desolation Sound — Carrington Bay
+  - query: fair-weather bay in Desolation Sound with warm lagoon swimming and a good stern-tie spot east of the islet
+    expect: ["Carrington Bay"]
+
+  # Desolation Sound — Copeland Islands Southern
+  - query: tight squeeze with shore rings to stern-tie near Thulin Passage but watch for sunken wrecks when anchoring
+    expect: ["Copeland Islands - Southern Anchorage"]
+
+  # Desolation Sound — Cortes Bay
+  - query: popular Desolation Sound anchorage with notorious poor holding and lots of floatplane traffic
+    expect: ["Cortes Bay"]
+
+  # Gulf Islands — Bedwell Harbour
+  - query: convenient US-Canada customs clearance anchorage in the Gulf Islands with good summer restaurant and resort
+    expect: ["Bedwell Harbour (Beaumont Marine Park / Poets Cove)"]
+
+  # Gulf Islands — Cabbage Island
+  - query: south-facing marine park beaches in the Gulf Islands good for multihulls but uncomfortable in northerly winds
+    expect: ["Cabbage Island"]
+
+  # Gulf Islands — Burgoyne Bay
+  - query: stunning bay beneath Salt Spring Island mountain summits with hiking trails to panoramic viewpoints
+    expect: ["Burgoyne Bay"]
+
+  # Sunshine Coast — Ballet Bay
+  - query: well-protected bay on the Sunshine Coast with a narrow northeast entrance where you lose track of days exploring by dinghy
+    expect: ["Ballet Bay"]
+
+  # Sunshine Coast — Chatterbox Falls
+  - query: spectacular waterfall anchorage at the head of an inlet with mooring rings and a pier, strenuous hike to a trapper cabin above
+    expect: ["Chatterbox Falls"]
+
+  # San Juan Islands — Blind Bay
+  - query: favourite crab-trapping anchorage on Shaw Island with ferry terminal and general store nearby
+    expect: ["Blind Bay"]
+
+  # San Juan Islands — Doe Bay
+  - query: anchorage off a retreat with yurts and a beloved cafe on Orcas Island, open to south and east
+    expect: ["Doe Bay (Main Anchorage)"]
+
+  # Puget Sound — Dungeness Spit
+  - query: eerie remote anchorage in the lee of the longest sand spit in the United States with a lighthouse at the tip
+    expect: ["Dungeness Spit"]
