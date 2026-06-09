@@ -94,3 +94,25 @@ def test_ensure_same_instance_rebuilds_after_change(tmp_path, monkeypatch):
     idx.ensure()                        # same instance — must not short-circuit
     assert idx._fp != fp1               # fingerprint advanced -> it rebuilt
     assert idx._index.count() >= 3      # 2 fixtures + the new one
+
+
+def test_search_returns_payload(tmp_path, monkeypatch):
+    if not S.HAS_SEARCH:
+        pytest.skip("[search] extra not installed")
+    idx, vault = _fixture_index(tmp_path, monkeypatch)
+    out = idx.search("anchorage exposed to southwest wind", limit=2)
+    assert "hits" in out and out["hits"]
+    top = out["hits"][0]
+    assert top["name"] == "Test Cove"
+    assert set(top) == {"name", "region", "lat", "lon", "citation", "score", "text"}
+    assert top["lat"] == 48.51
+    assert "good holding" in top["text"]
+    assert top["citation"].startswith("Test Cove (")
+
+
+def test_search_empty_query_returns_no_hits(tmp_path, monkeypatch):
+    if not S.HAS_SEARCH:
+        pytest.skip("[search] extra not installed")
+    idx, vault = _fixture_index(tmp_path, monkeypatch)
+    out = idx.search("", limit=5)
+    assert out == {"hits": []}

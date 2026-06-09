@@ -110,3 +110,16 @@ class AnchorageIndex:
             index = _vs.Index.open(db)
         self._index = index
         self._fp = fp
+
+    def search(self, query: str, limit: int = 5) -> dict:
+        if not query or not query.strip():
+            return {"hits": []}
+        try:
+            self.ensure()
+        except Exception as exc:  # e.g. first-run model download fails offline
+            return {"hits": [], "error":
+                    f"semantic index unavailable ({exc}); the embedding model may "
+                    "need a one-time online download."}
+        hits = _vs.search(self._index, self._embedder, query,
+                          limit=limit, mode=DEFAULT_MODE)
+        return {"hits": [_to_hit(h) for h in hits]}
