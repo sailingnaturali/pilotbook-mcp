@@ -18,6 +18,9 @@ dependencies = [
 ingest = [
     "anthropic>=0.40.0",
 ]
+search = [
+    "vault-search>=0.2",
+]
 
 [project.scripts]
 pilotbook-mcp = "pilotbook_mcp.server:main"
@@ -26,6 +29,9 @@ pilotbook = "pilotbook_mcp.ingest.cli:main"
 [build-system]
 requires = ["uv_build>=0.11.14,<0.12.0"]
 build-backend = "uv_build"
+
+[tool.uv.sources]
+vault-search = { git = "https://github.com/sailingnaturali/vault-search", tag = "v0.2.0" }
 
 [dependency-groups]
 dev = [
