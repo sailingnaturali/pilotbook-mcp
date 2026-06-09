@@ -15,6 +15,8 @@ from pilotbook_mcp.search import PILOT
 
 
 def main() -> None:
+    if PILOT is None:
+        sys.exit("install the [search] extra first:  uv sync --extra search")
     golden, vault = Path(sys.argv[1]), Path(sys.argv[2])
     db = Path("/tmp/pilot-eval.db")
     run_eval(golden, vault, PILOT, db, label_field="name")   # prints the table

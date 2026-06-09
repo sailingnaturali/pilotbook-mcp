@@ -107,9 +107,10 @@ class AnchorageIndex:
         try:
             index = _vs.Index.open(db)
             index.count()               # force-detect a corrupt/garbage db (opens lazily)
-        except Exception:               # corrupt/unreadable -> rebuild once and reopen
+        except Exception:               # corrupt/unreadable db -> rebuild once
             self._build(db, fp)
             index = _vs.Index.open(db)
+            index.count()               # probe the rebuilt db too
         self._index = index
         self._fp = fp
 
@@ -122,6 +123,15 @@ class AnchorageIndex:
             return {"hits": [], "error":
                     f"semantic index unavailable ({exc}); the embedding model may "
                     "need a one-time online download."}
-        hits = _vs.search(self._index, self._embedder, query,
-                          limit=limit, mode=DEFAULT_MODE)
+        try:
+            hits = _vs.search(self._index, self._embedder, query,
+                              limit=limit, mode=DEFAULT_MODE)
+        except Exception as exc:        # reset so the next call re-opens/rebuilds
+            try:
+                self._index.close()
+            except Exception:
+                pass
+            self._index = None
+            self._fp = None
+            return {"hits": [], "error": f"search failed ({exc})"}
         return {"hits": [_to_hit(h) for h in hits]}

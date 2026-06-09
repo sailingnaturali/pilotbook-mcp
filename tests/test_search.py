@@ -116,3 +116,20 @@ def test_search_empty_query_returns_no_hits(tmp_path, monkeypatch):
     idx, vault = _fixture_index(tmp_path, monkeypatch)
     out = idx.search("", limit=5)
     assert out == {"hits": []}
+
+
+def test_search_resets_index_on_failure(tmp_path, monkeypatch):
+    if not S.HAS_SEARCH:
+        pytest.skip("[search] extra not installed")
+    idx, vault = _fixture_index(tmp_path, monkeypatch)
+    idx.ensure()
+    assert idx._index is not None
+
+    def boom(*a, **k):
+        raise RuntimeError("boom")
+    monkeypatch.setattr(S._vs, "search", boom)
+
+    out = idx.search("anything", limit=2)
+    assert out["hits"] == []
+    assert "search failed" in out["error"]
+    assert idx._index is None and idx._fp is None   # reset -> next call recovers
