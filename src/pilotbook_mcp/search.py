@@ -2,6 +2,11 @@
 
 from __future__ import annotations
 
+import hashlib
+import os
+import tempfile
+from pathlib import Path
+
 try:
     import vault_search as _vs
     HAS_SEARCH = True
@@ -45,3 +50,58 @@ def _to_hit(hit) -> dict:
         "score": hit.score,
         "text": hit.chunk.text,
     }
+
+
+def _cache_root() -> Path:
+    base = os.environ.get("XDG_CACHE_HOME") or os.path.expanduser("~/.cache")
+    return Path(base) / "pilotbook-mcp"
+
+
+class AnchorageIndex:
+    """Lazily builds and self-heals a cached vault-search index for one vault."""
+
+    def __init__(self, vault_root: Path) -> None:
+        self.vault_root = Path(vault_root)
+        self._embedder = None
+        self._index = None
+        self._fp: str | None = None
+
+    def cache_path(self) -> Path:
+        h = hashlib.sha1(str(self.vault_root.resolve()).encode()).hexdigest()[:16]
+        return _cache_root() / f"{h}.db"
+
+    def _fingerprint(self) -> str:
+        parts = []
+        for p in sorted(self.vault_root.glob(PILOT.glob)):
+            st = p.stat()
+            rel = p.relative_to(self.vault_root)
+            parts.append(f"{rel}:{st.st_size}:{st.st_mtime_ns}")
+        return hashlib.sha1("\n".join(parts).encode()).hexdigest()
+
+    def _build(self, db: Path, fp: str) -> None:
+        chunks = _vs.chunk_vault(self.vault_root, PILOT)
+        _vs.build_index(db, chunks, self._embedder)
+        db.with_suffix(".fp").write_text(fp)
+
+    def ensure(self) -> None:
+        fp = self._fingerprint()
+        if self._index is not None and self._fp == fp:
+            return                      # fresh in-process
+        if self._embedder is None:
+            self._embedder = _vs.Embedder()
+        db = self.cache_path()
+        try:
+            db.parent.mkdir(parents=True, exist_ok=True)
+        except OSError:                 # cache dir not writable -> temp db for the session
+            db = Path(tempfile.gettempdir()) / db.name
+        fp_file = db.with_suffix(".fp")
+        fresh = (db.exists() and fp_file.exists()
+                 and fp_file.read_text().strip() == fp)
+        if not fresh:
+            self._build(db, fp)
+        try:
+            self._index = _vs.Index.open(db)
+        except Exception:               # corrupt/unreadable db -> rebuild once
+            self._build(db, fp)
+            self._index = _vs.Index.open(db)
+        self._fp = fp
