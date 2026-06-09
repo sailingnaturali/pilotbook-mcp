@@ -27,7 +27,7 @@ weather with a beach to land the dinghy."
 
 | Decision | Choice | Rationale |
 |---|---|---|
-| Code acquisition | Publish `vault-search` to PyPI (public, MIT); depend on it via a new `[search]` optional extra | One source of truth; base `uvx pilotbook-mcp` stays light (`mcp`+`pyyaml`). |
+| Code acquisition | Make the `vault-search` GitHub repo public (MIT, **no PyPI**); depend on it via a **git source** (uv `[tool.uv.sources]`) pinned to a tag, under a new `[search]` optional extra | One source of truth, npm-style git dependency, zero registry ceremony; base `uvx pilotbook-mcp` stays light (`mcp`+`pyyaml`). Flip to PyPI later only if it gets outside traction (delete the source override). |
 | Chunk strategy | `whole_file` (one chunk per anchorage) | Anchorage files are already ~150–320-word coherent units with no internal headings. |
 | Index lifecycle | Lazy build, cached, self-healing | Index can't silently go stale; a fresh vault checkout just works. |
 | Cache location | XDG: `~/.cache/pilotbook-mcp/<hash-of-vault-path>.db` | Keeps the private vault repo clean of derived artifacts. |
@@ -42,8 +42,8 @@ weather with a beach to land the dinghy."
 Add a `mode` parameter to `vault_search.search.search()`:
 `mode="hybrid"` (default, current behavior), `"vector"` (KNN only), `"keyword"` (BM25 only).
 This lets consumers select the retriever the eval recommends without reimplementing fusion.
-Returns `list[SearchHit]` as today. ~10 lines + unit tests. Released as a new vault-search
-version that pilotbook-mcp pins.
+Returns `list[SearchHit]` as today. ~10 lines + unit tests. Tagged as a new vault-search
+release (e.g. `v0.2.0`) that pilotbook-mcp's git source pins.
 
 ### pilotbook-mcp: `src/pilotbook_mcp/search.py`
 
@@ -157,6 +157,19 @@ definition — no copy in vault-search, no drift.
 
 ## Dependencies
 
-- New optional extra `search = ["vault-search>=<published version>"]` (pulls fastembed +
-  sqlite-vec transitively). Base install unchanged.
-- vault-search must be published to PyPI (public, MIT) first — prerequisite step.
+- New optional extra declares the dependency by name:
+  `search = ["vault-search>=0.2"]` (pulls fastembed + sqlite-vec transitively). Base install
+  unchanged.
+- A `[tool.uv.sources]` entry resolves it from the public GitHub repo at a pinned tag, e.g.:
+  ```toml
+  [tool.uv.sources]
+  vault-search = { git = "https://github.com/sailingnaturali/vault-search", tag = "v0.2.0" }
+  ```
+  No PyPI involved. Publishing to PyPI later is a one-line change (remove the source override).
+
+## Prerequisites (sequenced in the plan, before the pilotbook tool)
+
+1. Add the `mode` param to `vault_search.search.search()` (+ tests) in the vault-search repo.
+2. Tag a vault-search release (`v0.2.0`).
+3. Make the vault-search GitHub repo **public** (MIT, no secrets) so the git source installs
+   with zero auth.
