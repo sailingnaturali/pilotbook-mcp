@@ -78,5 +78,19 @@ def test_ensure_rebuilds_corrupt_db(tmp_path, monkeypatch):
     idx.ensure()
     idx.cache_path().write_bytes(b"corrupt not-a-sqlite-db")
     idx2 = S.AnchorageIndex(vault)
-    idx2.ensure()                      # must not raise
-    assert idx2._index is not None
+    idx2.ensure()                       # must not raise
+    assert idx2._index.count() >= 1     # real recovery: rebuilt index is queryable
+
+
+def test_ensure_same_instance_rebuilds_after_change(tmp_path, monkeypatch):
+    if not S.HAS_SEARCH:
+        pytest.skip("[search] extra not installed")
+    idx, vault = _fixture_index(tmp_path, monkeypatch)
+    idx.ensure()
+    fp1 = idx._fp
+    (vault / "anchorages" / "another.md").write_text(
+        "---\nname: Another\nregion: X\nsource: T 2025\nsource_page: 3\n"
+        "lat: 48.9\nlon: -123.2\n---\nAnother calm spot.\n", encoding="utf-8")
+    idx.ensure()                        # same instance — must not short-circuit
+    assert idx._fp != fp1               # fingerprint advanced -> it rebuilt
+    assert idx._index.count() >= 3      # 2 fixtures + the new one

@@ -89,6 +89,9 @@ class AnchorageIndex:
             return                      # fresh in-process
         if self._embedder is None:
             self._embedder = _vs.Embedder()
+        if self._index is not None:     # release any prior open index (no fd leak)
+            self._index.close()
+            self._index = None
         db = self.cache_path()
         try:
             db.parent.mkdir(parents=True, exist_ok=True)
@@ -100,8 +103,10 @@ class AnchorageIndex:
         if not fresh:
             self._build(db, fp)
         try:
-            self._index = _vs.Index.open(db)
-        except Exception:               # corrupt/unreadable db -> rebuild once
+            index = _vs.Index.open(db)
+            index.count()               # force-detect a corrupt/garbage db (opens lazily)
+        except Exception:               # corrupt/unreadable -> rebuild once and reopen
             self._build(db, fp)
-            self._index = _vs.Index.open(db)
+            index = _vs.Index.open(db)
+        self._index = index
         self._fp = fp
