@@ -1011,7 +1011,7 @@ requires-dist = [
     { name = "anthropic", marker = "extra == 'ingest'", specifier = ">=0.40.0" },
     { name = "mcp", specifier = ">=1.27.1" },
     { name = "pyyaml", specifier = ">=6.0.2" },
-    { name = "vault-search", marker = "extra == 'search'", git = "https://github.com/sailingnaturali/vault-search?tag=v0.2.0" },
+    { name = "vault-search", marker = "extra == 'search'", git = "https://github.com/sailingnaturali/vault-search?tag=v0.2.1" },
 ]
 provides-extras = ["ingest", "search"]
 
@@ -1740,8 +1740,8 @@ wheels = [
 
 [[package]]
 name = "vault-search"
-version = "0.2.0"
-source = { git = "https://github.com/sailingnaturali/vault-search?tag=v0.2.0#0b6d8e1c3a720a90e2fc44c2bc00c06ee871989c" }
+version = "0.2.1"
+source = { git = "https://github.com/sailingnaturali/vault-search?tag=v0.2.1#217e768b42e8791d6a34b92ff5a3968b2c6137f0" }
 dependencies = [
     { name = "fastembed" },
     { name = "python-frontmatter" },

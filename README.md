@@ -61,7 +61,7 @@ is derived from the vault path; the fingerprint tracks file sizes and mtimes so
 the cache self-heals automatically when vault content changes.  Subsequent calls
 are instant.
 
-### Results (pilot vault)
+### Results (pilot vault, measured 2026-06-08)
 
 Measured on 20 natural-language queries spanning all seven source regions
 (Broughton Archipelago, Desolation Sound, Gulf Islands, Puget Sound, San Juan
