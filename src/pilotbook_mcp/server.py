@@ -101,7 +101,8 @@ def tool_list(has_search: bool) -> list[types.Tool]:
     return tools_list
 
 
-def dispatch(vault: Vault, name: str, args: dict, anchorage_index=None) -> dict:
+def dispatch(vault: Vault, name: str, args: dict,
+             anchorage_index: "search_mod.AnchorageIndex | None" = None) -> dict:
     """Route a tool call to its implementation. Shared by the server and tests."""
     if name == "search_anchorages":
         if anchorage_index is None:
@@ -125,6 +126,7 @@ def build_server(vault: Vault) -> Server:
     anchorage_index = (
         search_mod.AnchorageIndex(vault.root) if search_mod.HAS_SEARCH else None
     )
+    search_lock = asyncio.Lock()
 
     @server.list_tools()
     async def _list_tools() -> list[types.Tool]:
@@ -134,7 +136,8 @@ def build_server(vault: Vault) -> Server:
     async def _call_tool(name: str, arguments: dict | None) -> list[types.TextContent]:
         args = arguments or {}
         if name == "search_anchorages":
-            result = await asyncio.to_thread(dispatch, vault, name, args, anchorage_index)
+            async with search_lock:
+                result = await asyncio.to_thread(dispatch, vault, name, args, anchorage_index)
         else:
             result = dispatch(vault, name, args)
         return [types.TextContent(type="text", text=json.dumps(result, ensure_ascii=False))]

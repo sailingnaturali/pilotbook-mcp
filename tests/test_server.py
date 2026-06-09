@@ -3,7 +3,7 @@ from pathlib import Path
 
 import pytest
 
-from pilotbook_mcp.server import dispatch
+from pilotbook_mcp.server import dispatch, tool_list
 from pilotbook_mcp.vault import Vault
 
 FIXTURE = Path(__file__).parent / "fixtures" / "vault"
@@ -40,9 +40,6 @@ def test_dispatch_list_sources(vault):
 def test_dispatch_unknown_tool_raises(vault):
     with pytest.raises(ValueError):
         dispatch(vault, "nope", {})
-
-
-from pilotbook_mcp.server import dispatch, tool_list
 
 
 def test_tool_list_includes_search_when_available():
