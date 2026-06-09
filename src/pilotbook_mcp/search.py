@@ -16,8 +16,10 @@ except ImportError:  # the [search] extra isn't installed
 
 INSTALL_HINT = "semantic search requires: pip install 'pilotbook-mcp[search]'"
 
-# Retriever mode chosen by the eval in a later task; defaults to hybrid until measured.
-DEFAULT_MODE = "hybrid"
+# Retriever mode chosen by scripts/eval_search.py on the pilot vault (2026-06-08):
+# keyword MRR 0.90 > hybrid 0.79 > vector 0.64 → keyword.
+# Re-run the eval if the vault changes materially.
+DEFAULT_MODE = "keyword"
 
 if HAS_SEARCH:
     PILOT = _vs.VaultProfile(
