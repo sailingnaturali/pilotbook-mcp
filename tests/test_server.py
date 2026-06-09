@@ -40,3 +40,34 @@ def test_dispatch_list_sources(vault):
 def test_dispatch_unknown_tool_raises(vault):
     with pytest.raises(ValueError):
         dispatch(vault, "nope", {})
+
+
+from pilotbook_mcp.server import dispatch, tool_list
+
+
+def test_tool_list_includes_search_when_available():
+    names = {t.name for t in tool_list(has_search=True)}
+    assert "search_anchorages" in names
+    assert {"find_anchorages_near", "get_anchorage",
+            "rank_anchorages", "list_sources"} <= names
+
+
+def test_tool_list_excludes_search_when_unavailable():
+    names = {t.name for t in tool_list(has_search=False)}
+    assert "search_anchorages" not in names
+
+
+def test_dispatch_routes_search_to_index():
+    class FakeIndex:
+        def search(self, query, limit=5):
+            return {"hits": [{"name": "Stub", "query": query, "limit": limit}]}
+    out = dispatch(vault=None, name="search_anchorages",
+                   args={"query": "calm cove", "limit": 2},
+                   anchorage_index=FakeIndex())
+    assert out["hits"][0] == {"name": "Stub", "query": "calm cove", "limit": 2}
+
+
+def test_dispatch_without_extra_returns_install_hint():
+    out = dispatch(vault=None, name="search_anchorages",
+                   args={"query": "anything"}, anchorage_index=None)
+    assert "pilotbook-mcp[search]" in out["error"]
