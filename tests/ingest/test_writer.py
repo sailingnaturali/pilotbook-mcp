@@ -56,3 +56,28 @@ def test_write_anchorage_creates_slugged_md(tmp_path):
     reparsed = Anchorage.from_markdown(path.read_text(encoding="utf-8"))
     assert reparsed.name == "Test Cove"
     assert reparsed.exposed_sectors == ["SW"]
+
+
+def test_duplicate_slug_from_different_page_disambiguates(tmp_path, capsys):
+    from pilotbook_mcp.ingest.writer import write_anchorage
+    from pilotbook_mcp.models import Anchorage
+    a1 = Anchorage(name="Twin Cove", source="Book", lat=48.5, lon=-123.4,
+                   source_pdf="book.pdf#page=10")
+    a2 = Anchorage(name="Twin Cove", source="Book", lat=50.1, lon=-125.0,
+                   source_pdf="book.pdf#page=42")
+    p1 = write_anchorage(tmp_path, a1)
+    p2 = write_anchorage(tmp_path, a2)
+    assert p1 != p2
+    assert p2.name == "twin-cove-p42.md"
+    assert "duplicate slug" in capsys.readouterr().err
+    assert p1.exists() and p2.exists()        # nothing clobbered
+
+
+def test_same_page_reingest_overwrites_in_place(tmp_path):
+    from pilotbook_mcp.ingest.writer import write_anchorage
+    from pilotbook_mcp.models import Anchorage
+    a = Anchorage(name="Twin Cove", source="Book", lat=48.5, lon=-123.4,
+                  source_pdf="book.pdf#page=10")
+    p1 = write_anchorage(tmp_path, a)
+    p2 = write_anchorage(tmp_path, a)
+    assert p1 == p2

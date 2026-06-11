@@ -57,3 +57,24 @@ def test_rank_orders_calmest_first_and_breaks_ties_by_crowding():
     assert [r["name"] for r in ranked] == ["NWExposed", "BusyCalm", "SWExposed"]
     assert "SW" in ranked[-1]["reason"]
     assert ranked[0]["score"] == 0.0
+
+
+def test_near_boundary_wind_penalizes_adjacent_exposed_sector():
+    # 030° wind must penalize an N-exposed anchorage (old 8-point snap missed
+    # anything more than 22.5° from the sector center).
+    n_exposed = Anchorage(name="NExposed", source="X", lat=48.5, lon=-123.4,
+                          exposed_sectors=["N"], holding="good", crowding="low")
+    step = {"time": "t", "wind_from_deg": 30, "wind_kn": 20.0,
+            "swell_from_deg": None, "swell_m": None}
+    s = score_anchorage(n_exposed, [step])
+    assert s.wind_penalty == 20.0
+    assert "N" in s.reason
+
+
+def test_rank_breaks_full_ties_by_name():
+    a = Anchorage(name="Beta Bay", source="X", lat=48.5, lon=-123.4,
+                  exposed_sectors=["SW"], holding="good", crowding="low")
+    b = Anchorage(name="Alpha Cove", source="X", lat=48.6, lon=-123.4,
+                  exposed_sectors=["SW"], holding="good", crowding="low")
+    ranked = rank_anchorages([a, b], [_sw_wind_step(kn=10.0)])
+    assert [r["name"] for r in ranked] == ["Alpha Cove", "Beta Bay"]

@@ -5,11 +5,15 @@ from __future__ import annotations
 import hashlib
 import re
 import shutil
+import sys
 from pathlib import Path
 
 import yaml
 
 from pilotbook_mcp.models import Anchorage
+
+_SOURCE_PDF_RE = re.compile(r"^source_pdf:\s*['\"]?(.+?)['\"]?\s*$", re.MULTILINE)
+_PAGE_SUFFIX_RE = re.compile(r"#page=(\d+)\s*$")
 
 
 def slugify(text: str) -> str:
@@ -49,5 +53,18 @@ def write_anchorage(vault: str | Path, anchorage: Anchorage) -> Path:
     anchor_dir = Path(vault) / "anchorages" / book
     anchor_dir.mkdir(parents=True, exist_ok=True)
     path = anchor_dir / f"{slugify(anchorage.name)}.md"
+    if path.exists():
+        # Same slug from a DIFFERENT source page is a distinct anchorage that
+        # would silently clobber the earlier record (the resume page-coverage
+        # check can't see it — different pages). Disambiguate by page; the
+        # same page is a legitimate re-ingest and overwrites in place.
+        existing = _SOURCE_PDF_RE.search(path.read_text(encoding="utf-8"))
+        if (existing and anchorage.source_pdf
+                and existing.group(1) != anchorage.source_pdf):
+            page = _PAGE_SUFFIX_RE.search(anchorage.source_pdf)
+            suffix = f"-p{page.group(1)}" if page else "-2"
+            print(f"pilotbook ingest: duplicate slug {path.stem!r} in {book} — "
+                  f"writing {path.stem}{suffix}.md instead", file=sys.stderr)
+            path = anchor_dir / f"{path.stem}{suffix}.md"
     path.write_text(anchorage.to_markdown(), encoding="utf-8")
     return path

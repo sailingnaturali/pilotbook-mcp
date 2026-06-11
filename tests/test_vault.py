@@ -38,3 +38,29 @@ def test_load_recurses_into_book_subfolders(tmp_path):
     )
     v = Vault.load(tmp_path)
     assert v.get("Deep Cove") is not None
+
+
+def test_load_skips_malformed_file_keeps_rest(tmp_path, capsys):
+    # One bad frontmatter must not blank all 673 anchorages at startup (R3).
+    book = tmp_path / "anchorages" / "test-book"
+    book.mkdir(parents=True)
+    (book / "good.md").write_text(
+        "---\nname: Good Cove\nsource: T\nlat: 48.5\nlon: -123.4\n---\nFine.\n",
+        encoding="utf-8")
+    (book / "bad.md").write_text("not even frontmatter", encoding="utf-8")
+    v = Vault.load(tmp_path)
+    assert [a.name for a in v.anchorages] == ["Good Cove"]
+    assert "bad.md" in capsys.readouterr().err
+
+
+def test_load_warns_on_duplicate_names(tmp_path, capsys):
+    book = tmp_path / "anchorages" / "test-book"
+    book.mkdir(parents=True)
+    for fn in ("one.md", "two.md"):
+        (book / fn).write_text(
+            "---\nname: Same Cove\nsource: T\nlat: 48.5\nlon: -123.4\n---\nx\n",
+            encoding="utf-8")
+    v = Vault.load(tmp_path)
+    assert len(v.anchorages) == 2
+    assert "duplicate" in capsys.readouterr().err.lower()
+    assert v.get("Same Cove") is not None      # O(1) dict lookup still works
