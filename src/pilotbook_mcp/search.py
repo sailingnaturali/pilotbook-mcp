@@ -3,9 +3,13 @@
 from __future__ import annotations
 
 import hashlib
+import logging
 import os
 import tempfile
+import threading
 from pathlib import Path
+
+logger = logging.getLogger(__name__)
 
 try:
     import vault_search as _vs
@@ -67,6 +71,9 @@ class AnchorageIndex:
         self._embedder = None
         self._index = None
         self._fp: str | None = None
+        # ensure() runs from the server's startup-warm thread and from search
+        # calls; without this, concurrent first calls race duplicate builds.
+        self._ensure_lock = threading.Lock()
 
     def cache_path(self) -> Path:
         h = hashlib.sha1(str(self.vault_root.resolve()).encode()).hexdigest()[:16]
@@ -85,7 +92,24 @@ class AnchorageIndex:
         _vs.build_index(db, chunks, self._embedder)
         db.with_suffix(".fp").write_text(fp)
 
+    def warm(self) -> None:
+        """Best-effort ensure() for the server's startup thread.
+
+        A cold or stale index costs ~30 s (embed the whole corpus); paying
+        that inside a live search blows the voice pipeline's timeout, so the
+        server kicks this off at startup instead. Failures are logged, never
+        raised — search() will retry and report its own error.
+        """
+        try:
+            self.ensure()
+        except Exception as exc:
+            logger.warning("index warm failed (search will retry): %s", exc)
+
     def ensure(self) -> None:
+        with self._ensure_lock:
+            self._ensure_locked()
+
+    def _ensure_locked(self) -> None:
         fp = self._fingerprint()
         if self._index is not None and self._fp == fp:
             return                      # fresh in-process

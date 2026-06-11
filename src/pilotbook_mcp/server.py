@@ -8,6 +8,7 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+import threading
 
 import mcp.types as types
 from mcp.server import Server
@@ -126,6 +127,12 @@ def build_server(vault: Vault) -> Server:
     anchorage_index = (
         search_mod.AnchorageIndex(vault.root) if search_mod.HAS_SEARCH else None
     )
+    if anchorage_index is not None:
+        # Build/refresh the search index off the startup path so a cold or
+        # stale cache (~30 s: embeds the whole corpus) never lands inside a
+        # live search call — that blows the voice pipeline's timeout.
+        threading.Thread(target=anchorage_index.warm,
+                         name="anchorage-index-warm", daemon=True).start()
     search_lock = asyncio.Lock()
 
     @server.list_tools()

@@ -68,3 +68,25 @@ def test_dispatch_without_extra_returns_install_hint():
     out = dispatch(vault=None, name="search_anchorages",
                    args={"query": "anything"}, anchorage_index=None)
     assert "pilotbook-mcp[search]" in out["error"]
+
+
+def test_build_server_starts_index_warm_thread(monkeypatch, tmp_path):
+    # build_server must construct cleanly and kick the warm thread when the
+    # [search] extra is present (regression: missing threading import).
+    import threading as _threading
+    from pilotbook_mcp import server as server_mod
+    from pilotbook_mcp.vault import Vault
+
+    monkeypatch.setenv("XDG_CACHE_HOME", str(tmp_path / "cache"))
+    started = []
+    orig_thread = _threading.Thread
+
+    class SpyThread(orig_thread):
+        def start(self):
+            started.append(self.name)
+            super().start()
+
+    monkeypatch.setattr(server_mod.threading, "Thread", SpyThread)
+    server_mod.build_server(Vault.load(FIXTURE))
+    if server_mod.search_mod.HAS_SEARCH:
+        assert "anchorage-index-warm" in started

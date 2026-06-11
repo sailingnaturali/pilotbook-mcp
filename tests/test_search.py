@@ -133,3 +133,37 @@ def test_search_resets_index_on_failure(tmp_path, monkeypatch):
     assert out["hits"] == []
     assert "search failed" in out["error"]
     assert idx._index is None and idx._fp is None   # reset -> next call recovers
+
+
+def test_ensure_is_thread_safe(tmp_path, monkeypatch):
+    # The server warms the index from a daemon thread at startup while a
+    # search may arrive concurrently — both funnel through ensure().
+    if not S.HAS_SEARCH:
+        pytest.skip("[search] extra not installed")
+    import threading
+    idx, _ = _fixture_index(tmp_path, monkeypatch)
+    builds = []
+    orig_build = idx._build
+
+    def counting_build(db, fp):
+        builds.append(1)
+        orig_build(db, fp)
+
+    monkeypatch.setattr(idx, "_build", counting_build)
+    threads = [threading.Thread(target=idx.ensure) for _ in range(4)]
+    for t in threads:
+        t.start()
+    for t in threads:
+        t.join()
+    assert len(builds) == 1          # built exactly once, no racing rebuilds
+    assert idx.search("cove", limit=1)["hits"] is not None
+
+
+def test_warm_never_raises(tmp_path, monkeypatch):
+    # warm() runs unsupervised in a daemon thread — a broken vault must not
+    # take the server down or print a traceback into the MCP stdio stream.
+    if not S.HAS_SEARCH:
+        pytest.skip("[search] extra not installed")
+    monkeypatch.setenv("XDG_CACHE_HOME", str(tmp_path / "cache"))
+    idx = S.AnchorageIndex(tmp_path / "does-not-exist")
+    idx.warm()  # must not raise
