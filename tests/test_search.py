@@ -46,18 +46,14 @@ def _fixture_index(tmp_path, monkeypatch):
     return S.AnchorageIndex(vault), vault
 
 
-def test_ensure_builds_cache(tmp_path, monkeypatch):
-    if not S.HAS_SEARCH:
-        pytest.skip("[search] extra not installed")
+def test_ensure_builds_cache(tmp_path, monkeypatch, model_available):
     idx, vault = _fixture_index(tmp_path, monkeypatch)
     idx.ensure()
     assert idx.cache_path().exists()
     assert idx.cache_path().with_suffix(".fp").exists()
 
 
-def test_ensure_self_heals_on_vault_change(tmp_path, monkeypatch):
-    if not S.HAS_SEARCH:
-        pytest.skip("[search] extra not installed")
+def test_ensure_self_heals_on_vault_change(tmp_path, monkeypatch, model_available):
     idx, vault = _fixture_index(tmp_path, monkeypatch)
     idx.ensure()
     fp1 = idx.cache_path().with_suffix(".fp").read_text()
@@ -71,9 +67,7 @@ def test_ensure_self_heals_on_vault_change(tmp_path, monkeypatch):
     assert fp1 != fp2
 
 
-def test_ensure_rebuilds_corrupt_db(tmp_path, monkeypatch):
-    if not S.HAS_SEARCH:
-        pytest.skip("[search] extra not installed")
+def test_ensure_rebuilds_corrupt_db(tmp_path, monkeypatch, model_available):
     idx, vault = _fixture_index(tmp_path, monkeypatch)
     idx.ensure()
     idx.cache_path().write_bytes(b"corrupt not-a-sqlite-db")
@@ -82,9 +76,7 @@ def test_ensure_rebuilds_corrupt_db(tmp_path, monkeypatch):
     assert idx2._index.count() >= 1     # real recovery: rebuilt index is queryable
 
 
-def test_ensure_same_instance_rebuilds_after_change(tmp_path, monkeypatch):
-    if not S.HAS_SEARCH:
-        pytest.skip("[search] extra not installed")
+def test_ensure_same_instance_rebuilds_after_change(tmp_path, monkeypatch, model_available):
     idx, vault = _fixture_index(tmp_path, monkeypatch)
     idx.ensure()
     fp1 = idx._fp
@@ -96,9 +88,7 @@ def test_ensure_same_instance_rebuilds_after_change(tmp_path, monkeypatch):
     assert idx._index.count() >= 3      # 2 fixtures + the new one
 
 
-def test_search_returns_payload(tmp_path, monkeypatch):
-    if not S.HAS_SEARCH:
-        pytest.skip("[search] extra not installed")
+def test_search_returns_payload(tmp_path, monkeypatch, model_available):
     idx, vault = _fixture_index(tmp_path, monkeypatch)
     out = idx.search("anchorage exposed to southwest wind", limit=2)
     assert "hits" in out and out["hits"]
@@ -118,9 +108,7 @@ def test_search_empty_query_returns_no_hits(tmp_path, monkeypatch):
     assert out == {"hits": []}
 
 
-def test_search_resets_index_on_failure(tmp_path, monkeypatch):
-    if not S.HAS_SEARCH:
-        pytest.skip("[search] extra not installed")
+def test_search_resets_index_on_failure(tmp_path, monkeypatch, model_available):
     idx, vault = _fixture_index(tmp_path, monkeypatch)
     idx.ensure()
     assert idx._index is not None
@@ -135,11 +123,9 @@ def test_search_resets_index_on_failure(tmp_path, monkeypatch):
     assert idx._index is None and idx._fp is None   # reset -> next call recovers
 
 
-def test_ensure_is_thread_safe(tmp_path, monkeypatch):
+def test_ensure_is_thread_safe(tmp_path, monkeypatch, model_available):
     # The server warms the index from a daemon thread at startup while a
     # search may arrive concurrently — both funnel through ensure().
-    if not S.HAS_SEARCH:
-        pytest.skip("[search] extra not installed")
     import threading
     idx, _ = _fixture_index(tmp_path, monkeypatch)
     builds = []
