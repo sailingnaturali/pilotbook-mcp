@@ -156,9 +156,7 @@ def build_server(vault: Vault) -> Server:
         threading.Thread(target=anchorage_index.warm,
                          name="anchorage-index-warm", daemon=True).start()
     search_lock = asyncio.Lock()
-    from marine_forecast import RateLimitedClient
     from pilotbook_mcp.assess import assess_anchorage
-    forecast_client = RateLimitedClient()
 
     @server.list_tools()
     async def _list_tools() -> list[types.Tool]:
@@ -169,7 +167,7 @@ def build_server(vault: Vault) -> Server:
         args = arguments or {}
         if name == "assess_anchorage":
             result = await assess_anchorage(
-                vault, forecast_client,
+                vault,
                 lat=args["lat"], lon=args["lon"],
                 radius_nm=args.get("radius_nm", 10.0),
                 hours=args.get("hours", 12))
