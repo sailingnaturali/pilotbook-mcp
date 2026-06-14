@@ -12,6 +12,7 @@ requires-python = ">=3.11"
 dependencies = [
     "mcp>=1.27.1",
     "pyyaml>=6.0.2",
+    "marine-forecast>=0.1.0",
 ]
 
 [project.optional-dependencies]
@@ -32,6 +33,7 @@ build-backend = "uv_build"
 
 [tool.uv.sources]
 vault-search = { git = "https://github.com/sailingnaturali/vault-search", tag = "v0.2.1" }
+marine-forecast = { git = "https://github.com/sailingnaturali/marine-forecast", tag = "v0.1.0" }
 
 [dependency-groups]
 dev = [

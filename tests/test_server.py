@@ -54,6 +54,13 @@ def test_tool_list_excludes_search_when_unavailable():
     assert "search_anchorages" not in names
 
 
+def test_assess_anchorage_is_registered():
+    names = {t.name for t in tool_list(has_search=False)}
+    assert "assess_anchorage" in names
+    tool = next(t for t in tool_list(has_search=False) if t.name == "assess_anchorage")
+    assert set(tool.inputSchema["required"]) == {"lat", "lon"}
+
+
 def test_dispatch_routes_search_to_index():
     class FakeIndex:
         def search(self, query, limit=5):
