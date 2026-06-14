@@ -9,6 +9,8 @@ VAULT = Path(__file__).parent / "fixtures" / "vault"
 
 
 def test_pilot_profile_shape():
+    if not S.HAS_SEARCH:
+        pytest.skip("[search] extra not installed")
     assert S.PILOT.chunk_strategy == "whole_file"
     assert S.PILOT.glob == "anchorages/**/*.md"
     assert S.PILOT.citation == "{name} ({source}, p.{source_page})"
@@ -21,6 +23,8 @@ def test_as_float():
 
 
 def test_to_hit_maps_chunk():
+    if not S.HAS_SEARCH:
+        pytest.skip("[search] extra not installed")
     import vault_search as vs
     chunk = vs.Chunk.make(
         doc_path="anchorages/x.md", ordinal=0,
