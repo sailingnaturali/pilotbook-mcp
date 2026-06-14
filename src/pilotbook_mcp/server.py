@@ -78,6 +78,28 @@ def tool_list(has_search: bool) -> list[types.Tool]:
             description="The pilot books ingested into the vault.",
             inputSchema={"type": "object", "properties": {}},
         ),
+        types.Tool(
+            name="assess_anchorage",
+            description=(
+                "Use this to decide whether/where to anchor for the night near a "
+                "position — e.g. 'is it safe to anchor here tonight?' / 'where "
+                "should we anchor tonight?'. ONE call: finds nearby anchorages, "
+                "fetches the overnight wind forecast, and ranks them by protection "
+                "with a lee-shore wind-shift flag. Do NOT hand-assemble this from "
+                "find_anchorages_near + the forecast + rank_anchorages — this tool "
+                "composes them."
+            ),
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "lat": {"type": "number"},
+                    "lon": {"type": "number"},
+                    "radius_nm": {"type": "number", "description": "Search radius in NM (default 10)."},
+                    "hours": {"type": "integer", "description": "Overnight forecast horizon in hours (default 12)."},
+                },
+                "required": ["lat", "lon"],
+            },
+        ),
     ]
     if has_search:
         tools_list.append(
@@ -134,6 +156,9 @@ def build_server(vault: Vault) -> Server:
         threading.Thread(target=anchorage_index.warm,
                          name="anchorage-index-warm", daemon=True).start()
     search_lock = asyncio.Lock()
+    from marine_forecast import RateLimitedClient
+    from pilotbook_mcp.assess import assess_anchorage
+    forecast_client = RateLimitedClient()
 
     @server.list_tools()
     async def _list_tools() -> list[types.Tool]:
@@ -142,6 +167,14 @@ def build_server(vault: Vault) -> Server:
     @server.call_tool()
     async def _call_tool(name: str, arguments: dict | None) -> list[types.TextContent]:
         args = arguments or {}
+        if name == "assess_anchorage":
+            result = await assess_anchorage(
+                vault, forecast_client,
+                lat=args["lat"], lon=args["lon"],
+                radius_nm=args.get("radius_nm", 10.0),
+                hours=args.get("hours", 12))
+            return [types.TextContent(type="text",
+                                      text=json.dumps(result, ensure_ascii=False))]
         if name == "search_anchorages":
             async with search_lock:
                 result = await asyncio.to_thread(dispatch, vault, name, args, anchorage_index)
