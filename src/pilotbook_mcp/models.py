@@ -20,6 +20,7 @@ class Anchorage:
     source_pdf: str | None = None       # vault-relative link to the page: ../sources/<file>.pdf#page=N
     depth_min_m: float | None = None
     depth_max_m: float | None = None
+    controlling_depth_m: float | None = None  # charted least depth on the approach/entrance (bar, sill, shoal)
     bottom: list[str] = field(default_factory=list)
     holding: str | None = None           # good | fair | poor | variable
     exposed_sectors: list[str] = field(default_factory=list)

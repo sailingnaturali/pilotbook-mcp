@@ -93,3 +93,17 @@ def test_facilities_fields_round_trip():
     assert r.potable_water is True
     assert r.garbage is True
     assert r.facilities == ["fuel", "restaurant", "wifi"]
+
+
+def test_controlling_depth_round_trips():
+    a = Anchorage(name="Anderson Cove", source="S", lat=48.37, lon=-123.65,
+                  controlling_depth_m=1.8)
+    r = Anchorage.from_markdown(a.to_markdown())
+    assert r.controlling_depth_m == 1.8
+
+
+def test_controlling_depth_absent_defaults_none():
+    a = Anchorage.from_markdown(
+        "---\nname: Bare Bay\nsource: \"X\"\nlat: 48.0\nlon: -123.0\n---\nBody.\n"
+    )
+    assert a.controlling_depth_m is None
