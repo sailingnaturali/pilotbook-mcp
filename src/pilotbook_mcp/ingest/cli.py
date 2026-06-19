@@ -17,6 +17,7 @@ from pilotbook_mcp.ingest import pdf
 from pilotbook_mcp.ingest.audit import audit_record, disagrees, format_worklist
 from pilotbook_mcp.ingest.cleanup import clean_file_text, examples
 from pilotbook_mcp.ingest.confirm import confirm_controlling_depth
+from pilotbook_mcp.ingest.depth_propose import propose_controlling_depth
 from pilotbook_mcp.ingest.extract import extract_record
 from pilotbook_mcp.ingest.segment import candidate_pages
 from pilotbook_mcp.ingest.writer import archive_source, sha256_file, slugify, update_manifest, write_anchorage
@@ -206,6 +207,60 @@ def run_audit(source: str, vault: str | None = None, model: str = "claude-sonnet
           f"Worklist: {path}")
 
 
+def run_backfill_depths(source: str | None = None, all_books: bool = False,
+                        vault: str | None = None, apply: bool = False,
+                        model: str = "claude-sonnet-4-6") -> None:
+    """Backfill controlling_depth_m: LLM proposes from prose, regex confirms, only
+    confirmed values are written. Touches no other field. Resumable (skips set records)."""
+    if not source and not all_books:
+        print("Specify --source <book> or --all.")
+        return
+    v = Vault.load(Path(vault) if vault else None)
+    records = v.anchorages
+    if source:
+        book = slugify(source)
+        records = [a for a in records if slugify(a.source) == book]
+    if not records:
+        print(f"No anchorages for the requested scope in {v.root.resolve()}.")
+        return
+
+    client = _make_client()
+    populated: list[str] = []
+    dropped: list[str] = []
+    skipped = unknown = errored = 0
+    for a in records:
+        if a.controlling_depth_m is not None:
+            skipped += 1
+            continue
+        try:
+            proposed = propose_controlling_depth(a.prose, client=client, model=model)
+        except Exception as exc:  # one bad record must not abort the batch
+            errored += 1
+            logger.warning("depth proposal failed on %s: %s", a.name, exc)
+            continue
+        if proposed is None:
+            unknown += 1
+            continue
+        a.controlling_depth_m = proposed
+        note = confirm_controlling_depth(a)   # drops to None if not literally in prose
+        if a.controlling_depth_m is not None:
+            populated.append(f"{a.name} → {a.controlling_depth_m} m")
+            if apply:
+                write_anchorage(v.root, a)
+        else:
+            dropped.append(note)  # confirm always returns a note when it drops the value
+
+    mode = "Applied" if apply else "DRY RUN"
+    print(f"{mode}: {len(populated)} populated, {len(dropped)} dropped-unconfirmed, "
+          f"{unknown} unknown, {skipped} already set, {errored} errored. Vault: {v.root.resolve()}")
+    for line in populated:
+        print(f"  populated: {line}")
+    for line in dropped:
+        print(f"  dropped:   {line}")
+    if not apply and (populated or dropped):
+        print("Re-run with --apply to write.")
+
+
 def run_clean_prose(source: str | None = None, vault: str | None = None, apply: bool = False) -> None:
     """Strip chartlet sub-spot letters (q, r, s…) from prose bodies. Dry-run unless apply."""
     v = Vault.load(Path(vault) if vault else None)
@@ -270,6 +325,14 @@ def main() -> None:
     p_cln.add_argument("--vault", default=None)
     p_cln.add_argument("--apply", action="store_true", help="write changes (default: dry run)")
 
+    p_bf = sub.add_parser("backfill-depths",
+                          help="LLM-propose + regex-confirm controlling_depth_m on existing records")
+    p_bf.add_argument("--source", default=None, help="limit to one book (e.g. \"SalishSeaPilot — Gulf Islands 2025\")")
+    p_bf.add_argument("--all", dest="all_books", action="store_true", help="all books in the vault")
+    p_bf.add_argument("--vault", default=None)
+    p_bf.add_argument("--apply", action="store_true", help="write changes (default: dry run)")
+    p_bf.add_argument("--model", default="claude-sonnet-4-6")
+
     args = parser.parse_args()
     if args.cmd == "ingest":
         run_ingest(args.pdf, source=args.source, vault=args.vault, force=args.force)
@@ -281,3 +344,6 @@ def main() -> None:
         run_audit(args.source, vault=args.vault, model=args.model)
     elif args.cmd == "clean-prose":
         run_clean_prose(source=args.source, vault=args.vault, apply=args.apply)
+    elif args.cmd == "backfill-depths":
+        run_backfill_depths(source=args.source, all_books=args.all_books,
+                            vault=args.vault, apply=args.apply, model=args.model)

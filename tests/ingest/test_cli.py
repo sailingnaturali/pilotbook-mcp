@@ -243,3 +243,69 @@ def test_run_index_writes_index_json_and_md(tmp_path):
     index_md = (vault / "INDEX.md").read_text()
     assert "## Gulf Islands" in index_md
     assert "[A](anchorages/x/a.md)" in index_md
+
+
+# ---------------------------------------------------------------------------
+# backfill-depths tests
+# ---------------------------------------------------------------------------
+
+from pathlib import Path
+
+from pilotbook_mcp.ingest import cli as cli_mod
+from pilotbook_mcp.models import Anchorage
+from pilotbook_mcp.vault import Vault
+
+
+class _DepthResp:
+    def __init__(self, payload):
+        class _Block:
+            type = "tool_use"
+            name = "propose_controlling_depth"
+            def __init__(self, p): self.input = p
+        self.content = [_Block(payload)]
+
+
+class _DepthMessages:
+    def create(self, **kwargs):
+        prose = kwargs["messages"][0]["content"]
+        if "shallows to" in prose:
+            return _DepthResp({"has_controlling_depth": True, "controlling_depth_m": 1.5})
+        return _DepthResp({"has_controlling_depth": False})
+
+
+class _DepthClient:
+    messages = _DepthMessages()
+
+
+def _bf_write(root: Path, name: str, prose: str, controlling=None):
+    a = Anchorage(name=name, source="TestPilot — Region 2025", lat=48.5, lon=-123.4,
+                  controlling_depth_m=controlling, prose=prose)
+    book = root / "anchorages" / "testpilot-region-2025"
+    book.mkdir(parents=True, exist_ok=True)
+    (book / f"{name.lower().replace(' ', '-')}.md").write_text(a.to_markdown(), encoding="utf-8")
+
+
+def _make_backfill_vault(tmp_path) -> Path:
+    root = tmp_path / "vault"
+    _bf_write(root, "Entrance Cove", "The entrance shallows to 1.5 m at zero tide.")
+    _bf_write(root, "Deep Bay", "Anchor in 8 m over mud. Good holding.")
+    _bf_write(root, "Already Set", "The entrance shallows to 1.5 m.", controlling=2.0)
+    return root
+
+
+def test_backfill_dry_run_writes_nothing(tmp_path, monkeypatch):
+    root = _make_backfill_vault(tmp_path)
+    monkeypatch.setattr(cli_mod, "_make_client", lambda: _DepthClient())
+    cli_mod.run_backfill_depths(all_books=True, vault=str(root), apply=False)
+    v = Vault.load(root)
+    assert v.get("Entrance Cove").controlling_depth_m is None
+
+
+def test_backfill_apply_populates_only_confirmed(tmp_path, monkeypatch):
+    root = _make_backfill_vault(tmp_path)
+    monkeypatch.setattr(cli_mod, "_make_client", lambda: _DepthClient())
+    cli_mod.run_backfill_depths(all_books=True, vault=str(root), apply=True)
+    v = Vault.load(root)
+    assert v.get("Entrance Cove").controlling_depth_m == 1.5   # proposed + confirmed
+    assert v.get("Deep Bay").controlling_depth_m is None       # LLM said no entrance depth
+    assert v.get("Already Set").controlling_depth_m == 2.0     # skipped (already set)
