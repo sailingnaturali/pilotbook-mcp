@@ -23,8 +23,13 @@ Call `propose_controlling_depth`.
   6 feet" (6 feet -> report 1.83).
   Also set `evidence` to the exact phrase you read the depth from, quoted verbatim from the prose.
 - has_controlling_depth = false when:
+  * the figure is a VERTICAL clearance, not depth of water - "bridge clearance 8.5 metres",
+    "overhead", "air draft", "mast clearance", "requiring X metres overhead" (these limit
+    HEIGHT, not your keel) - NEVER report these as controlling depth;
   * the depth given is where you ANCHOR, not the approach - "anchor in 5-6 metres at zero
     tide", "depths of 5-7 metres inside the lagoon" (these are interior/anchoring depths);
+  * the prose only says to "contact"/"call ahead"/"plan entry in advance" WITHOUT stating
+    an actual approach depth;
   * the entrance is described only qualitatively - "dries near half tide", "shallow
     approach, shoal-draft only" - with no usable metre/foot/fathom figure;
   * no approach depth is mentioned at all.
@@ -80,6 +85,6 @@ def propose_controlling_depth(prose: str, *, client, model: str = "claude-sonnet
             evidence = data.get("evidence")
             if (data.get("has_controlling_depth") and isinstance(depth, (int, float))
                     and isinstance(evidence, str) and evidence.strip()):
-                return float(depth), evidence
+                return round(float(depth), 1), evidence  # 0.1 m precision; no 2.4384 noise
             return None, None
     return None, None

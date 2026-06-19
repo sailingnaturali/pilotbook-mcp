@@ -61,3 +61,11 @@ def test_returns_none_pair_when_value_missing():
 def test_returns_none_pair_when_evidence_missing():
     client = _FakeClient({"has_controlling_depth": True, "controlling_depth_m": 1.5})
     assert propose_controlling_depth("x", client=client, model="m") == (None, None)
+
+
+def test_proposed_depth_is_rounded_to_one_decimal():
+    # 8 feet -> 2.4384 m; report 2.4, not the over-precise conversion
+    client = _FakeClient({"has_controlling_depth": True, "controlling_depth_m": 2.4384,
+                          "evidence": "drawing eight feet or less"})
+    depth, _ = propose_controlling_depth("x", client=client, model="m")
+    assert depth == 2.4
