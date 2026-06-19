@@ -38,6 +38,29 @@ _FACTOR = {
     "foot": 0.3048, "feet": 0.3048, "ft": 0.3048,
 }
 
+# A measurement token: must NOT follow a letter (so "calm"/"draft"/"from" don't match),
+# but MAY follow a digit so the no-space form "1.5m"/"3ft" is caught. Bare "m" included —
+# it's the most common abbreviation ("1.5 m", "2m").
+_UNIT_TOKEN = re.compile(r"(?<![a-z])(metres?|meters?|fathoms?|feet|foot|ft|m)\b", re.I)
+
+
+def _normalise(text: str) -> str:
+    """Collapse whitespace and casefold so a verbatim quote matches across wrapping/case."""
+    return " ".join((text or "").split()).casefold()
+
+
+def quote_confirms(prose: str, evidence: str) -> bool:
+    """True if the LLM's evidence quote is a real, depth-bearing substring of the prose.
+
+    Anti-hallucination: the model cannot quote text that isn't there. Robust to
+    spelled-out numbers and parentheticals because it matches the phrase, not the digit.
+    """
+    if not evidence:
+        return False
+    if not _UNIT_TOKEN.search(evidence):   # must be a depth citation, not arbitrary text
+        return False
+    return _normalise(evidence) in _normalise(prose)
+
 
 def find_controlling_depths(prose: str | None) -> list[float]:
     """Every approach/entrance depth figure the known idioms yield, converted to metres."""
