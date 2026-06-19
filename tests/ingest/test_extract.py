@@ -64,3 +64,9 @@ def test_extract_record_builds_anchorage_from_tool_call():
 def test_extract_record_returns_none_for_non_anchorage_page():
     client = _FakeClient({"is_anchorage": False})
     assert extract_record("cover page", source="X", client=client, model="m") is None
+
+
+def test_extract_schema_includes_controlling_depth():
+    props = ANCHORAGE_TOOL["input_schema"]["properties"]
+    assert "controlling_depth_m" in props
+    assert props["controlling_depth_m"]["type"] == "number"
