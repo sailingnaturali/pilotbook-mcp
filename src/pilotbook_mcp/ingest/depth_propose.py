@@ -21,6 +21,7 @@ Call `propose_controlling_depth`.
   "depths in the entrance drop to 0.2 fathoms at zero tide" (0.2 fathoms -> report 0.37);
   "drawing more than 2 m should enter on a rising tide" (report 2); "the bar carries
   6 feet" (6 feet -> report 1.83).
+  Also set `evidence` to the exact phrase you read the depth from, quoted verbatim from the prose.
 - has_controlling_depth = false when:
   * the depth given is where you ANCHOR, not the approach - "anchor in 5-6 metres at zero
     tide", "depths of 5-7 metres inside the lagoon" (these are interior/anchoring depths);
@@ -41,7 +42,12 @@ PROPOSE_TOOL = {
             "controlling_depth_m": {"type": "number",
                 "description": "the approach/entrance least depth in METRES (convert feet/fathoms); "
                                "omit when has_controlling_depth is false"},
+            "evidence": {"type": "string",
+                "description": "the VERBATIM phrase from the prose that states this depth — "
+                               "quote it exactly, do not paraphrase; omit when has_controlling_depth is false"},
         },
+        # Only has_controlling_depth is required; a true flag missing controlling_depth_m or
+        # evidence is handled in code (returns no proposal) rather than failing validation.
         "required": ["has_controlling_depth"],
     },
     "cache_control": {"type": "ephemeral"},
@@ -53,14 +59,15 @@ def build_propose_prompt() -> list[dict]:
     return [{"type": "text", "text": _INSTRUCTIONS, "cache_control": {"type": "ephemeral"}}]
 
 
-def propose_controlling_depth(prose: str, *, client, model: str = "claude-sonnet-4-6") -> float | None:
-    """Ask the model for the entrance/approach controlling depth in metres, or None.
+def propose_controlling_depth(prose: str, *, client, model: str = "claude-sonnet-4-6") -> tuple[float | None, str | None]:
+    """Ask the model for (entrance controlling depth in metres, verbatim evidence quote).
 
-    Never raises on model-output shape — returns None if no usable tool call came back.
+    Returns (None, None) unless the model flags an entrance depth AND supplies both a
+    numeric depth and a non-empty evidence quote. Never raises on model-output shape.
     """
     resp = client.messages.create(
         model=model,
-        max_tokens=300,
+        max_tokens=400,
         system=build_propose_prompt(),
         tools=[PROPOSE_TOOL],
         tool_choice={"type": "tool", "name": "propose_controlling_depth"},
@@ -69,7 +76,10 @@ def propose_controlling_depth(prose: str, *, client, model: str = "claude-sonnet
     for block in resp.content:
         if getattr(block, "type", None) == "tool_use" and getattr(block, "name", None) == "propose_controlling_depth":
             data = dict(block.input)
-            if data.get("has_controlling_depth") and isinstance(data.get("controlling_depth_m"), (int, float)):
-                return float(data["controlling_depth_m"])
-            return None
-    return None
+            depth = data.get("controlling_depth_m")
+            evidence = data.get("evidence")
+            if (data.get("has_controlling_depth") and isinstance(depth, (int, float))
+                    and isinstance(evidence, str) and evidence.strip()):
+                return float(depth), evidence
+            return None, None
+    return None, None

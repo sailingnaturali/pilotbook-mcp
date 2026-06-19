@@ -16,7 +16,7 @@ logger = logging.getLogger(__name__)
 from pilotbook_mcp.ingest import pdf
 from pilotbook_mcp.ingest.audit import audit_record, disagrees, format_worklist
 from pilotbook_mcp.ingest.cleanup import clean_file_text, examples
-from pilotbook_mcp.ingest.confirm import confirm_controlling_depth
+from pilotbook_mcp.ingest.confirm import confirm_controlling_depth, quote_confirms
 from pilotbook_mcp.ingest.depth_propose import propose_controlling_depth
 from pilotbook_mcp.ingest.extract import extract_record
 from pilotbook_mcp.ingest.segment import candidate_pages
@@ -210,7 +210,8 @@ def run_audit(source: str, vault: str | None = None, model: str = "claude-sonnet
 def run_backfill_depths(source: str | None = None, all_books: bool = False,
                         vault: str | None = None, apply: bool = False,
                         model: str = "claude-sonnet-4-6") -> None:
-    """Backfill controlling_depth_m: LLM proposes from prose, regex confirms, only
+    """Backfill controlling_depth_m: LLM proposes a depth + verbatim evidence quote from
+    the prose, quote_confirms verifies the quote is literally in the prose, and only
     confirmed values are written. Touches no other field. Resumable (skips set records)."""
     if not source and not all_books:
         print("Specify --source <book> or --all.")
@@ -233,22 +234,21 @@ def run_backfill_depths(source: str | None = None, all_books: bool = False,
             skipped += 1
             continue
         try:
-            proposed = propose_controlling_depth(a.prose, client=client, model=model)
+            depth, evidence = propose_controlling_depth(a.prose, client=client, model=model)
         except Exception as exc:  # one bad record must not abort the batch
             errored += 1
             logger.warning("depth proposal failed on %s: %s", a.name, exc)
             continue
-        if proposed is None:
+        if depth is None:
             unknown += 1
             continue
-        a.controlling_depth_m = proposed
-        note = confirm_controlling_depth(a)   # drops to None if not literally in prose
-        if a.controlling_depth_m is not None:
-            populated.append(f"{a.name} → {a.controlling_depth_m} m")
+        if quote_confirms(a.prose, evidence):
+            a.controlling_depth_m = depth
+            populated.append(f"{a.name} → {depth} m  «{evidence}»")
             if apply:
                 write_anchorage(v.root, a)
         else:
-            dropped.append(note)  # confirm always returns a note when it drops the value
+            dropped.append(f"{a.name}: evidence quote not found in prose (proposed {depth} m)")
 
     mode = "Applied" if apply else "DRY RUN"
     print(f"{mode}: {len(populated)} populated, {len(dropped)} dropped-unconfirmed, "

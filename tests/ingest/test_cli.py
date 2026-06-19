@@ -269,7 +269,11 @@ class _DepthMessages:
     def create(self, **kwargs):
         prose = kwargs["messages"][0]["content"]
         if "shallows to" in prose:
-            return _DepthResp({"has_controlling_depth": True, "controlling_depth_m": 1.5})
+            return _DepthResp({"has_controlling_depth": True, "controlling_depth_m": 1.5,
+                               "evidence": "shallows to 1.5 m"})
+        if "phantom" in prose.lower():  # proposes a quote that is NOT in the prose
+            return _DepthResp({"has_controlling_depth": True, "controlling_depth_m": 2.0,
+                               "evidence": "drawing 2 metres or less"})
         return _DepthResp({"has_controlling_depth": False})
 
 
@@ -289,6 +293,7 @@ def _make_backfill_vault(tmp_path) -> Path:
     root = tmp_path / "vault"
     _bf_write(root, "Entrance Cove", "The entrance shallows to 1.5 m at zero tide.")
     _bf_write(root, "Deep Bay", "Anchor in 8 m over mud. Good holding.")
+    _bf_write(root, "Phantom Cove", "A quiet phantom bay, no stated entrance depth.")
     _bf_write(root, "Already Set", "The entrance shallows to 1.5 m.", controlling=2.0)
     return root
 
@@ -301,11 +306,12 @@ def test_backfill_dry_run_writes_nothing(tmp_path, monkeypatch):
     assert v.get("Entrance Cove").controlling_depth_m is None
 
 
-def test_backfill_apply_populates_only_confirmed(tmp_path, monkeypatch):
+def test_backfill_apply_populates_only_quote_confirmed(tmp_path, monkeypatch):
     root = _make_backfill_vault(tmp_path)
     monkeypatch.setattr(cli_mod, "_make_client", lambda: _DepthClient())
     cli_mod.run_backfill_depths(all_books=True, vault=str(root), apply=True)
     v = Vault.load(root)
-    assert v.get("Entrance Cove").controlling_depth_m == 1.5   # proposed + confirmed
-    assert v.get("Deep Bay").controlling_depth_m is None       # LLM said no entrance depth
-    assert v.get("Already Set").controlling_depth_m == 2.0     # skipped (already set)
+    assert v.get("Entrance Cove").controlling_depth_m == 1.5   # quote in prose
+    assert v.get("Deep Bay").controlling_depth_m is None       # no entrance depth
+    assert v.get("Phantom Cove").controlling_depth_m is None   # quote NOT in prose -> dropped
+    assert v.get("Already Set").controlling_depth_m == 2.0     # skipped
