@@ -21,10 +21,7 @@ For `exposed_sectors`, list the 8-point compass directions the anchorage is OPEN
 i.e. wind or swell FROM those directions makes it uncomfortable. Examples:
 "exposed to SW" -> ["SW"]; "open to the southeast" -> ["SE"]; "good shelter in all
 but SE winds" -> ["SE"]. Derive lat/lon from the page coordinates (decimal degrees;
-W and S are negative). Record `controlling_depth_m` (in METRES) ONLY when the page states
-a least depth on the approach or entrance (a bar, sill, or shoal the boat must cross) —
-e.g. "drawing 1.8 m or less", "controlling depth 2 m", "the bar carries 1.5 m". Convert
-feet or fathoms to metres. Do not populate it from anchoring-depth prose. Set `confidence`
+W and S are negative). Set `confidence`
 to your confidence in exposed_sectors.
 Put the original anchorage description (lightly cleaned) in `prose`.
 Also record shore-side facilities when the page or its chartlet shows them (icons or
@@ -51,11 +48,6 @@ ANCHORAGE_TOOL = {
             "source_page": {"type": "integer"},
             "depth_min_m": {"type": "number"},
             "depth_max_m": {"type": "number"},
-            "controlling_depth_m": {"type": "number",
-                "description": "Charted LEAST depth in METRES on the approach/entrance (bar, "
-                               "sill, shoal) the vessel must cross to enter — NOT the "
-                               "anchoring depth. Omit if the page states no entrance/approach "
-                               "depth."},
             "bottom": {"type": "array",
                        "items": {"type": "string",
                                  "enum": ["mud", "sand", "rock", "kelp", "shell", "gravel"]}},
