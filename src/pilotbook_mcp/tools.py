@@ -2,27 +2,32 @@
 
 from __future__ import annotations
 
+from pilotbook_mcp.clearance import keel_clearance
 from pilotbook_mcp.geo import within_radius
 from pilotbook_mcp.scoring import rank_anchorages
 from pilotbook_mcp.vault import Vault
 
 
-def find_anchorages_near(vault: Vault, lat: float, lon: float, radius_nm: float = 10.0) -> dict:
+def find_anchorages_near(vault: Vault, lat: float, lon: float, radius_nm: float = 10.0,
+                         draft_m: float | None = None,
+                         keel_safety_margin_m: float = 0.5) -> dict:
     hits = within_radius(vault.anchorages, lat, lon, radius_nm)
-    return {
-        "anchorages": [
-            {
-                "name": a.name,
-                "distance_nm": round(dist, 2),
-                "lat": a.lat,
-                "lon": a.lon,
-                "exposed_sectors": a.exposed_sectors,
-                "holding": a.holding,
-                "crowding": a.crowding,
-            }
-            for a, dist in hits
-        ]
-    }
+    out = []
+    for a, dist in hits:
+        entry = {
+            "name": a.name,
+            "distance_nm": round(dist, 2),
+            "lat": a.lat,
+            "lon": a.lon,
+            "exposed_sectors": a.exposed_sectors,
+            "holding": a.holding,
+            "crowding": a.crowding,
+        }
+        if draft_m is not None:
+            entry["keel_clearance"] = keel_clearance(
+                a.controlling_depth_m, draft_m, keel_safety_margin_m)
+        out.append(entry)
+    return {"anchorages": out}
 
 
 def get_anchorage(vault: Vault, name: str) -> dict:

@@ -68,3 +68,27 @@ def test_get_anchorage_includes_controlling_depth():
 def test_list_sources():
     out = list_sources(_vault())
     assert out["sources"][0]["retitled"] == "testpilot-test-region-2025.pdf"
+
+
+def test_find_near_omits_clearance_without_draft():
+    res = find_anchorages_near(_vault(), lat=48.60, lon=-123.40, radius_nm=50)
+    assert res["anchorages"]
+    assert "keel_clearance" not in res["anchorages"][0]
+
+
+def test_find_near_attaches_clearance_with_draft():
+    res = find_anchorages_near(_vault(), lat=48.60, lon=-123.40, radius_nm=50,
+                               draft_m=1.37)
+    a = res["anchorages"][0]
+    assert "keel_clearance" in a
+    # telegraph-harbour fixture has no controlling depth -> unknown
+    assert a["keel_clearance"]["state"] == "unknown"
+
+
+def test_find_near_clearance_clear_for_deep_entrance():
+    # test-cove fixture has controlling_depth_m: 6 -> 6 >= 1.37 + 0.5 -> clear
+    res = find_anchorages_near(_vault(), lat=48.51, lon=-123.40, radius_nm=50,
+                               draft_m=1.37)
+    cove = next(a for a in res["anchorages"] if a["name"] == "Test Cove")
+    assert cove["keel_clearance"]["state"] == "clear"
+    assert cove["keel_clearance"]["controlling_depth_m"] == 6

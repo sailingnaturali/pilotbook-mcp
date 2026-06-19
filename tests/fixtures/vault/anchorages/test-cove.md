@@ -7,6 +7,7 @@ lat: 48.51
 lon: -123.40
 depth_min_m: 5
 depth_max_m: 10
+controlling_depth_m: 6
 bottom: [mud]
 holding: good
 exposed_sectors: [SW]
