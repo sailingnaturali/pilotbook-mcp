@@ -30,12 +30,14 @@ def test_llm_value_unconfirmed_is_dropped_and_audited():
     assert note is not None and "not found" in note
 
 
-def test_regex_only_figure_is_recorded_and_audited():
+def test_no_value_originated_when_model_proposes_nothing():
+    # Pure validator: with no LLM proposal, confirm never invents a depth from regex,
+    # even when the prose contains a matchable figure. Leaves it unknown (safe).
     a = Anchorage(name="X", source="S", controlling_depth_m=None,
                   prose="drawing 1.2 metres or less; entrance is shallow")
     note = confirm_controlling_depth(a)
-    assert a.controlling_depth_m == 1.2
-    assert note is not None and "review" in note
+    assert a.controlling_depth_m is None
+    assert note is None
 
 
 def test_no_depth_anywhere_stays_none_no_note():
@@ -46,11 +48,10 @@ def test_no_depth_anywhere_stays_none_no_note():
     assert note is None
 
 
-def test_multiple_figures_takes_shallowest():
-    a = Anchorage(name="X", source="S", controlling_depth_m=None,
-                  prose="drawing 2.0 metres or less; the bar carries 1.4 m")
-    confirm_controlling_depth(a)
-    assert a.controlling_depth_m == 1.4
+def test_find_returns_all_matched_figures():
+    # find_controlling_depths surfaces every matched figure; the LLM (not the regex)
+    # decides which is the entrance depth, and confirm validates the proposal against this set.
+    assert find_controlling_depths("drawing 2.0 metres or less; the bar carries 1.4 m") == [2.0, 1.4]
 
 
 def test_llm_value_disagreeing_with_prose_is_dropped():
@@ -67,9 +68,10 @@ def test_bar_dries_is_not_read_as_depth():
     assert find_controlling_depths("the bar dries 1.2 m at low water") == []
 
 
-def test_feet_and_fathoms_do_not_match():
-    assert find_controlling_depths("drawing 6 feet or less") == []
-    assert find_controlling_depths("the bar carries 1 fathom") == []
+def test_feet_and_fathoms_now_convert_to_metres():
+    # Unit conversion is intentional now (the author mixes units).
+    assert find_controlling_depths("drawing 6 feet or less") == [1.83]
+    assert find_controlling_depths("the bar carries 1 fathom") == [1.83]
 
 
 def test_entrance_anchoring_depth_is_not_grabbed():
@@ -81,3 +83,30 @@ def test_entrance_anchoring_depth_is_not_grabbed():
 
 def test_find_controlling_depths_handles_none():
     assert find_controlling_depths(None) == []
+
+
+def test_finds_shallows_to_phrasing():
+    assert find_controlling_depths("the entrance shallows to 1.1 metres at zero tide") == [1.1]
+
+
+def test_finds_drops_to_fathoms_converted():
+    # 0.2 fathoms * 1.8288 = 0.36576 -> 0.37
+    assert find_controlling_depths("depths in the entrance drop to 0.2 fathoms at zero tide") == [0.37]
+
+
+def test_finds_drawing_more_than_phrasing():
+    assert find_controlling_depths("sailboats drawing more than 2 m should enter on a rising tide") == [2.0]
+
+
+def test_finds_bar_carries_feet_converted():
+    # 6 feet * 0.3048 = 1.8288 -> 1.83
+    assert find_controlling_depths("the bar carries 6 feet") == [1.83]
+
+
+def test_confirm_keeps_within_widened_tolerance():
+    # LLM read "about one foot" as 0.3; prose figure is 0.2 fathoms (~0.37). 0.07 <= 0.08 -> keep.
+    a = Anchorage(name="X", source="S", controlling_depth_m=0.3,
+                  prose="depths in the entrance drop to 0.2 fathoms (about one foot) at zero tide")
+    note = confirm_controlling_depth(a)
+    assert a.controlling_depth_m == 0.3
+    assert note is None
