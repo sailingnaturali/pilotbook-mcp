@@ -33,6 +33,7 @@ def get_anchorage(vault: Vault, name: str) -> dict:
         "name": a.name, "region": a.region, "source": a.source, "source_page": a.source_page,
         "source_pdf": a.source_pdf,
         "lat": a.lat, "lon": a.lon, "depth_min_m": a.depth_min_m, "depth_max_m": a.depth_max_m,
+        "controlling_depth_m": a.controlling_depth_m,
         "bottom": a.bottom, "holding": a.holding, "exposed_sectors": a.exposed_sectors,
         "swing_room": a.swing_room, "tidal_current": a.tidal_current,
         "cell_coverage": a.cell_coverage, "crowding": a.crowding,

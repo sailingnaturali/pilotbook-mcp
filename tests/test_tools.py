@@ -57,6 +57,14 @@ def test_rank_anchorages_tool_reports_unknown_names():
     assert out["ranked"] == []
 
 
+def test_get_anchorage_includes_controlling_depth():
+    # telegraph-harbour fixture has no controlling depth -> key present, value None
+    res = get_anchorage(_vault(), name="Telegraph Harbour")
+    assert res["found"] is True
+    assert "controlling_depth_m" in res["anchorage"]
+    assert res["anchorage"]["controlling_depth_m"] is None
+
+
 def test_list_sources():
     out = list_sources(_vault())
     assert out["sources"][0]["retitled"] == "testpilot-test-region-2025.pdf"
