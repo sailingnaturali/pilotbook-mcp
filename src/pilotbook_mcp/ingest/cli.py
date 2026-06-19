@@ -16,7 +16,7 @@ logger = logging.getLogger(__name__)
 from pilotbook_mcp.ingest import pdf
 from pilotbook_mcp.ingest.audit import audit_record, disagrees, format_worklist
 from pilotbook_mcp.ingest.cleanup import clean_file_text, examples
-from pilotbook_mcp.ingest.confirm import confirm_controlling_depth, quote_confirms
+from pilotbook_mcp.ingest.confirm import quote_confirms
 from pilotbook_mcp.ingest.depth_propose import propose_controlling_depth
 from pilotbook_mcp.ingest.extract import extract_record
 from pilotbook_mcp.ingest.segment import candidate_pages
@@ -74,7 +74,6 @@ def run_ingest(pdf_path: str, source: str, vault: str | None = None, force: bool
     covered = set() if force else _covered_pages(root, source)
     client = _make_client()
     written = low = failed = skipped = 0
-    depth_reviews: list[str] = []
     for page_no, page in candidate_pages(pages):
         if page_no in covered:
             skipped += 1
@@ -91,9 +90,6 @@ def run_ingest(pdf_path: str, source: str, vault: str | None = None, force: bool
             failed += 1
             logger.warning("skipping %s: invalid coordinates (%s, %s)", a.name, a.lat, a.lon)
             continue
-        depth_note = confirm_controlling_depth(a)
-        if depth_note:
-            depth_reviews.append(depth_note)
         a.source_pdf = f"../sources/{dest.name}#page={page_no}"
         write_anchorage(root, a)
         written += 1
@@ -101,10 +97,6 @@ def run_ingest(pdf_path: str, source: str, vault: str | None = None, force: bool
             low += 1
     print(f"Ingested {written} new anchorages from {source} "
           f"({skipped} pages already done, {low} need review, {failed} errored). Vault: {root.resolve()}")
-    if depth_reviews:
-        print(f"{len(depth_reviews)} controlling-depth note(s) to review:")
-        for note in depth_reviews:
-            print(f"  - {note}")
 
 
 def run_review(vault: str | None = None) -> None:
@@ -326,7 +318,7 @@ def main() -> None:
     p_cln.add_argument("--apply", action="store_true", help="write changes (default: dry run)")
 
     p_bf = sub.add_parser("backfill-depths",
-                          help="LLM-propose + regex-confirm controlling_depth_m on existing records")
+                          help="LLM-propose + evidence-quote-confirm controlling_depth_m on existing records")
     p_bf.add_argument("--source", default=None, help="limit to one book (e.g. \"SalishSeaPilot — Gulf Islands 2025\")")
     p_bf.add_argument("--all", dest="all_books", action="store_true", help="all books in the vault")
     p_bf.add_argument("--vault", default=None)
