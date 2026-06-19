@@ -16,6 +16,7 @@ logger = logging.getLogger(__name__)
 from pilotbook_mcp.ingest import pdf
 from pilotbook_mcp.ingest.audit import audit_record, disagrees, format_worklist
 from pilotbook_mcp.ingest.cleanup import clean_file_text, examples
+from pilotbook_mcp.ingest.confirm import confirm_controlling_depth
 from pilotbook_mcp.ingest.extract import extract_record
 from pilotbook_mcp.ingest.segment import candidate_pages
 from pilotbook_mcp.ingest.writer import archive_source, sha256_file, slugify, update_manifest, write_anchorage
@@ -72,6 +73,7 @@ def run_ingest(pdf_path: str, source: str, vault: str | None = None, force: bool
     covered = set() if force else _covered_pages(root, source)
     client = _make_client()
     written = low = failed = skipped = 0
+    depth_reviews: list[str] = []
     for page_no, page in candidate_pages(pages):
         if page_no in covered:
             skipped += 1
@@ -88,6 +90,9 @@ def run_ingest(pdf_path: str, source: str, vault: str | None = None, force: bool
             failed += 1
             logger.warning("skipping %s: invalid coordinates (%s, %s)", a.name, a.lat, a.lon)
             continue
+        depth_note = confirm_controlling_depth(a)
+        if depth_note:
+            depth_reviews.append(depth_note)
         a.source_pdf = f"../sources/{dest.name}#page={page_no}"
         write_anchorage(root, a)
         written += 1
@@ -95,6 +100,10 @@ def run_ingest(pdf_path: str, source: str, vault: str | None = None, force: bool
             low += 1
     print(f"Ingested {written} new anchorages from {source} "
           f"({skipped} pages already done, {low} need review, {failed} errored). Vault: {root.resolve()}")
+    if depth_reviews:
+        print(f"{len(depth_reviews)} controlling-depth note(s) to review:")
+        for note in depth_reviews:
+            print(f"  - {note}")
 
 
 def run_review(vault: str | None = None) -> None:
