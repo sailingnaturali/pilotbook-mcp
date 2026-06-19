@@ -44,6 +44,8 @@ def tool_list(has_search: bool) -> list[types.Tool]:
                     "lat": {"type": "number"},
                     "lon": {"type": "number"},
                     "radius_nm": {"type": "number", "description": "Search radius in nautical miles (default 10)."},
+                    "draft_m": {"type": "number", "description": "Vessel draft in metres. When given, each result gets a keel_clearance verdict (chart-datum; add tide)."},
+                    "keel_safety_margin_m": {"type": "number", "description": "Required under-keel clearance in metres (default 0.5)."},
                 },
                 "required": ["lat", "lon"],
             },
@@ -96,6 +98,8 @@ def tool_list(has_search: bool) -> list[types.Tool]:
                     "lon": {"type": "number"},
                     "radius_nm": {"type": "number", "description": "Search radius in NM (default 10)."},
                     "hours": {"type": "integer", "description": "Overnight forecast horizon in hours (default 12)."},
+                    "draft_m": {"type": "number", "description": "Vessel draft in metres. When given, each candidate gets a keel_clearance verdict (chart-datum; add tide)."},
+                    "keel_safety_margin_m": {"type": "number", "description": "Required under-keel clearance in metres (default 0.5)."},
                 },
                 "required": ["lat", "lon"],
             },
@@ -133,7 +137,9 @@ def dispatch(vault: Vault, name: str, args: dict,
         return anchorage_index.search(args["query"], args.get("limit", 5))
     if name == "find_anchorages_near":
         return tools.find_anchorages_near(
-            vault, lat=args["lat"], lon=args["lon"], radius_nm=args.get("radius_nm", 10.0)
+            vault, lat=args["lat"], lon=args["lon"], radius_nm=args.get("radius_nm", 10.0),
+            draft_m=args.get("draft_m"),
+            keel_safety_margin_m=args.get("keel_safety_margin_m", 0.5),
         )
     if name == "get_anchorage":
         return tools.get_anchorage(vault, name=args["name"])
@@ -170,7 +176,9 @@ def build_server(vault: Vault) -> Server:
                 vault,
                 lat=args["lat"], lon=args["lon"],
                 radius_nm=args.get("radius_nm", 10.0),
-                hours=args.get("hours", 12))
+                hours=args.get("hours", 12),
+                draft_m=args.get("draft_m"),
+                keel_safety_margin_m=args.get("keel_safety_margin_m", 0.5))
             return [types.TextContent(type="text",
                                       text=json.dumps(result, ensure_ascii=False))]
         if name == "search_anchorages":

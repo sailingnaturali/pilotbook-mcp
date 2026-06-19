@@ -77,6 +77,23 @@ def test_dispatch_without_extra_returns_install_hint():
     assert "pilotbook-mcp[search]" in out["error"]
 
 
+def test_find_near_schema_advertises_draft():
+    from pilotbook_mcp.server import tool_list
+    by_name = {t.name: t for t in tool_list(has_search=False)}
+    props = by_name["find_anchorages_near"].inputSchema["properties"]
+    assert "draft_m" in props
+    assert "keel_safety_margin_m" in props
+    aprops = by_name["assess_anchorage"].inputSchema["properties"]
+    assert "draft_m" in aprops
+
+
+def test_dispatch_find_near_passes_draft(vault):
+    from pilotbook_mcp.server import dispatch
+    res = dispatch(vault, "find_anchorages_near",
+                   {"lat": 48.60, "lon": -123.40, "radius_nm": 50, "draft_m": 1.37})
+    assert "keel_clearance" in res["anchorages"][0]
+
+
 def test_build_server_starts_index_warm_thread(monkeypatch, tmp_path):
     # build_server must construct cleanly and kick the warm thread when the
     # [search] extra is present (regression: missing threading import).
