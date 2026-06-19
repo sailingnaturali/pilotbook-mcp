@@ -58,14 +58,18 @@ def lee_shore_shift(exposed_sectors: list[str], hours) -> dict | None:
 
 async def assess_anchorage(vault: Vault,
                            lat: float, lon: float, radius_nm: float = 10.0,
-                           hours: int = 12) -> dict:
+                           hours: int = 12, draft_m: float | None = None,
+                           keel_safety_margin_m: float = 0.5) -> dict:
     """Composed verdict: protection-ranked nearby anchorages vs the overnight
     forecast, each with a lee-shore/wind-shift flag. One call.
 
     Fix 4: creates and owns its own RateLimitedClient, always aclose()d.
     Fix 2: graceful degradation when forecast is unavailable or all-null.
-    Fix 3: consistent return shape across all paths."""
-    near = tools.find_anchorages_near(vault, lat=lat, lon=lon, radius_nm=radius_nm)
+    Fix 3: consistent return shape across all paths.
+    Task 5: when draft_m is supplied, keel_clearance is attached to each entry."""
+    near = tools.find_anchorages_near(vault, lat=lat, lon=lon, radius_nm=radius_nm,
+                                      draft_m=draft_m,
+                                      keel_safety_margin_m=keel_safety_margin_m)
     candidates = near.get("anchorages", [])[:_MAX_CANDIDATES]
 
     # Fix 3: no-candidates path includes forecast_hours key
@@ -94,7 +98,9 @@ async def assess_anchorage(vault: Vault,
                 "anchorages": [
                     {"name": c["name"],
                      "distance_nm": c.get("distance_nm"),
-                     "exposed_sectors": c.get("exposed_sectors", [])}
+                     "exposed_sectors": c.get("exposed_sectors", []),
+                     **({"keel_clearance": c["keel_clearance"]}
+                        if "keel_clearance" in c else {})}
                     for c in candidates
                 ],
                 "forecast_hours": 0,
@@ -111,6 +117,13 @@ async def assess_anchorage(vault: Vault,
         for entry in ranked:
             entry["lee_shore_shift"] = lee_shore_shift(
                 sectors_by_name.get(entry.get("name"), []), forecast_hours)
+
+        # Task 5: merge keel_clearance from candidates onto ranked entries
+        clearance_by_name = {c["name"]: c.get("keel_clearance") for c in candidates}
+        for entry in ranked:
+            kc = clearance_by_name.get(entry.get("name"))
+            if kc is not None:
+                entry["keel_clearance"] = kc
 
         # Fix 3: success path includes summary_display
         top = ranked[0]["name"] if ranked else "unknown"

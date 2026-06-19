@@ -204,3 +204,55 @@ async def test_assess_anchorage_closes_client_even_on_forecast_exception(vault):
         await assess_anchorage(vault, lat=48.51, lon=-123.40, radius_nm=20.0)
 
     assert closed == [True], "Client must be closed even when forecast fetch raises"
+
+
+# ---------------------------------------------------------------------------
+# Task 5: keel_clearance attached to assess_anchorage candidates
+# ---------------------------------------------------------------------------
+
+async def test_assess_attaches_keel_clearance(vault):
+    """Task 5: when draft_m is passed, each ranked anchorage must carry a
+    keel_clearance block with a valid state string."""
+    good_hours = [_hour(h, 315, 10.0) for h in range(6)]
+
+    with patch("pilotbook_mcp.assess.fetch_forecast", new=AsyncMock(return_value=good_hours)):
+        res = await assess_anchorage(vault, lat=48.60, lon=-123.40,
+                                     radius_nm=50, hours=6, draft_m=1.37)
+
+    assert res["anchorages"], "expected at least one ranked anchorage"
+    first = res["anchorages"][0]
+    assert "keel_clearance" in first, (
+        f"keel_clearance missing from first anchorage; keys present: {list(first.keys())}"
+    )
+    assert first["keel_clearance"]["state"] in {"clear", "tight", "unsafe_at_datum", "unknown"}, (
+        f"unexpected state value: {first['keel_clearance']['state']!r}"
+    )
+
+
+async def test_assess_attaches_keel_clearance_degraded_path(vault):
+    """Task 5: keel_clearance also appears on the degraded (no forecast) path."""
+    null_hours = [_null_wind_hour(h) for h in range(3)]
+
+    with patch("pilotbook_mcp.assess.fetch_forecast", new=AsyncMock(return_value=null_hours)):
+        res = await assess_anchorage(vault, lat=48.60, lon=-123.40,
+                                     radius_nm=50, hours=6, draft_m=1.37)
+
+    assert res["forecast_hours"] == 0, "degraded path must have forecast_hours == 0"
+    assert res["anchorages"], "expected at least one anchorage in degraded path"
+    first = res["anchorages"][0]
+    assert "keel_clearance" in first, (
+        f"keel_clearance missing from degraded anchorage; keys: {list(first.keys())}"
+    )
+    assert first["keel_clearance"]["state"] in {"clear", "tight", "unsafe_at_datum", "unknown"}
+
+
+async def test_assess_omits_keel_clearance_without_draft(vault):
+    """Task 5: with no draft_m, output must be unchanged — no keel_clearance key
+    on any anchorage (locks the additive contract)."""
+    good_hours = [_hour(h, 315, 10.0) for h in range(6)]
+
+    with patch("pilotbook_mcp.assess.fetch_forecast", new=AsyncMock(return_value=good_hours)):
+        res = await assess_anchorage(vault, lat=48.60, lon=-123.40, radius_nm=50, hours=6)
+
+    assert res["anchorages"], "expected at least one ranked anchorage"
+    assert all("keel_clearance" not in a for a in res["anchorages"])
